@@ -5,24 +5,67 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+type (
+	// ZapConfig defines the config for Zap Logger middleware.
+	ZapConfig struct {
+		// Skipper defines a function to skip middleware.
+		Skipper middleware.Skipper
+
+		// add req headers & resp headers to tracing tags
+		AreHeadersDump bool
+
+		// add req body & resp body to attributes
+		IsBodyDump bool
+
+		// prevent logging long http request bodies
+		LimitHTTPBody bool
+
+		// http body limit size (in bytes)
+		LimitSize int
+	}
+)
+
+var (
+	// DefaultZapConfig is the default Zap Logger middleware config.
+	DefaultZapConfig = ZapConfig{
+		Skipper:        middleware.DefaultSkipper,
+		AreHeadersDump: true,
+		IsBodyDump:     false,
+		LimitHTTPBody:  true,
+		LimitSize:      1024,
+	}
+)
+
+// Middleware returns a Zap Logger middleware with default config.
 func Middleware(logger *zap.Logger) echo.MiddlewareFunc {
+	return MiddlewareWithConfig(logger, DefaultZapConfig)
+}
+
+// MiddlewareWithConfig returns a Zap Logger middleware with config.
+func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(ctx echo.Context) error {
 			start := time.Now()
-			request := ctx.Request()
-			savedCtx := request.Context()
-			defer ctx.SetRequest(request.WithContext(savedCtx))
+			req := ctx.Request()
+			savedCtx := req.Context()
+			defer ctx.SetRequest(req.WithContext(savedCtx))
+			var respDumper *responseDumper
+
+			if config.IsBodyDump {
+				respDumper = newResponseDumper(ctx.Response())
+				ctx.Response().Writer = respDumper
+			}
 
 			err := next(ctx)
 			if err != nil {
 				ctx.Error(err)
 			}
 
-			req := ctx.Request()
 			res := ctx.Response()
 
 			id := req.Header.Get(echo.HeaderXRequestID)
@@ -52,13 +95,35 @@ func Middleware(logger *zap.Logger) echo.MiddlewareFunc {
 				logger.Info("Success", fields...)
 			}
 
-			buf, _ := io.ReadAll(req.Body)
-			defer func() {
-				_ = req.Body.Close()
-			}()
+			if config.IsBodyDump || config.AreHeadersDump {
+				additionalFields := make([]zapcore.Field, 0, 4)
+				// add headers
+				if config.AreHeadersDump {
+					additionalFields = append(additionalFields, zap.Any("request headers", req.Header), zap.Any("response headers", res.Header()))
+				}
 
-			logger.Debug("Additional info", zap.Any("Headers", req.Header), zap.String("Body", string(buf)))
+				// add body
+				if config.IsBodyDump {
+					buf, _ := io.ReadAll(req.Body)
+					defer func() {
+						_ = req.Body.Close()
+					}()
+					additionalFields = append(additionalFields, zap.String("request body", limitString(config, string(buf))))
+
+					additionalFields = append(additionalFields, zap.String("response body", limitString(config, respDumper.GetResponse())))
+				}
+				logger.Debug("Additional info", additionalFields...)
+			}
+
 			return nil
 		}
 	}
+}
+
+func limitString(config ZapConfig, str string) string {
+	if !config.LimitHTTPBody || len(str) <= config.LimitSize {
+		return str
+	}
+
+	return str[:config.LimitSize-3] + "..."
 }
