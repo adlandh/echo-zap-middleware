@@ -1,6 +1,7 @@
 package echo_zap_middleware
 
 import (
+	"bytes"
 	"io"
 	"time"
 
@@ -55,8 +56,18 @@ func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareF
 			savedCtx := req.Context()
 			defer ctx.SetRequest(req.WithContext(savedCtx))
 			var respDumper *responseDumper
+			var reqBody []byte
 
 			if config.IsBodyDump {
+				if req.Body != nil {
+					var err error
+					reqBody, err = io.ReadAll(req.Body)
+					if err == nil {
+						_ = req.Body.Close()
+						req.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // reset original request body
+					}
+				}
+
 				respDumper = newResponseDumper(ctx.Response())
 				ctx.Response().Writer = respDumper
 			}
@@ -104,13 +115,10 @@ func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareF
 
 				// add body
 				if config.IsBodyDump {
-					buf, _ := io.ReadAll(req.Body)
-					defer func() {
-						_ = req.Body.Close()
-					}()
-					additionalFields = append(additionalFields, zap.String("request body", limitString(config, string(buf))))
-
-					additionalFields = append(additionalFields, zap.String("response body", limitString(config, respDumper.GetResponse())))
+					additionalFields = append(additionalFields,
+						zap.String("request body", limitString(config, string(reqBody))),
+						zap.String("response body", limitString(config, respDumper.GetResponse())),
+					)
 				}
 				logger.Debug("Additional info", additionalFields...)
 			}
