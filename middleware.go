@@ -37,7 +37,7 @@ var (
 	// DefaultZapConfig is the default Zap Logger middleware config.
 	DefaultZapConfig = ZapConfig{
 		Skipper:        middleware.DefaultSkipper,
-		AreHeadersDump: true,
+		AreHeadersDump: false,
 		IsBodyDump:     false,
 		LimitHTTPBody:  true,
 		LimitSize:      1024,
