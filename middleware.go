@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	contextlogger "github.com/adlandh/context-logger"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -51,6 +52,8 @@ func Middleware(logger *zap.Logger) echo.MiddlewareFunc {
 
 // MiddlewareWithConfig returns a Zap Logger middleware with config.
 func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareFunc {
+	ctxLogger := contextlogger.WithContext(logger, contextlogger.WithOtelExtractor())
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(ctx echo.Context) error {
 			start := time.Now()
@@ -78,17 +81,19 @@ func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareF
 
 			switch {
 			case n >= 500:
-				logger.Error("Server error", fields...)
+				ctxLogger.Ctx(req.Context()).Error("Server error", fields...)
 			case n >= 400:
-				logger.Warn("Client error", fields...)
+				ctxLogger.Ctx(req.Context()).Warn("Client error", fields...)
 			case n >= 300:
-				logger.Info("Redirection", fields...)
+				ctxLogger.Ctx(req.Context()).Info("Redirection", fields...)
 			default:
-				logger.Info("Success", fields...)
+				ctxLogger.Ctx(req.Context()).Info("Success", fields...)
 			}
 
 			if config.IsBodyDump || config.AreHeadersDump {
-				additionalFields := make([]zapcore.Field, 0, 4)
+				additionalFields := make([]zapcore.Field, 0, 5)
+				// add request id
+				additionalFields = append(additionalFields, zap.String("request_id", id))
 				// add headers
 				if config.AreHeadersDump {
 					additionalFields = append(additionalFields, zap.Any("request headers", req.Header), zap.Any("response headers", res.Header()))
@@ -96,13 +101,10 @@ func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareF
 
 				// add body
 				if config.IsBodyDump {
-					additionalFields = append(additionalFields,
-						zap.String("request body", limitString(config, string(reqBody))),
-						zap.String("response body", limitString(config, respDumper.GetResponse())),
-					)
+					additionalFields = append(additionalFields, zap.String("request body", limitString(config, string(reqBody))), zap.String("response body", limitString(config, respDumper.GetResponse())))
 				}
 
-				logger.Debug("Additional info", additionalFields...)
+				ctxLogger.Ctx(req.Context()).Debug("Additional info", additionalFields...)
 			}
 
 			return nil
