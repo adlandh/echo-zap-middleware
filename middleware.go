@@ -8,6 +8,7 @@ import (
 	"time"
 
 	contextlogger "github.com/adlandh/context-logger"
+	"github.com/adlandh/response-dumper"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -112,8 +113,8 @@ func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareF
 	}
 }
 
-func prepareReqAndResp(ctx echo.Context, config ZapConfig) (*http.Request, *responseDumper, []byte, func()) {
-	var respDumper *responseDumper
+func prepareReqAndResp(ctx echo.Context, config ZapConfig) (*http.Request, *response.Dumper, []byte, func()) {
+	var respDumper *response.Dumper
 
 	var reqBody []byte
 
@@ -131,7 +132,7 @@ func prepareReqAndResp(ctx echo.Context, config ZapConfig) (*http.Request, *resp
 			}
 		}
 
-		respDumper = newResponseDumper(ctx.Response())
+		respDumper = response.NewDumper(ctx.Response())
 		ctx.Response().Writer = respDumper
 	}
 
