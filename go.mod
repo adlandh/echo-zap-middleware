@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/adlandh/context-logger v1.0.1
-	github.com/adlandh/echo-otel-middleware v1.0.2
+	github.com/adlandh/echo-otel-middleware v1.0.4
 	github.com/adlandh/response-dumper v1.0.1
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/stretchr/testify v1.8.4
