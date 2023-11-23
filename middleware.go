@@ -52,6 +52,7 @@ func Middleware(logger *zap.Logger) echo.MiddlewareFunc {
 }
 
 // MiddlewareWithConfig returns a Zap Logger middleware with config.
+// nolint:funlen,cyclop
 func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareFunc {
 	if config.Skipper == nil {
 		config.Skipper = middleware.DefaultSkipper
