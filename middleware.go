@@ -53,10 +53,18 @@ func Middleware(logger *zap.Logger) echo.MiddlewareFunc {
 
 // MiddlewareWithConfig returns a Zap Logger middleware with config.
 func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareFunc {
+	if config.Skipper == nil {
+		config.Skipper = middleware.DefaultSkipper
+	}
+
 	ctxLogger := contextlogger.WithContext(logger, contextlogger.WithOtelExtractor())
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(ctx echo.Context) error {
+			if config.Skipper(ctx) || ctx.Request() == nil || ctx.Response() == nil {
+				return next(ctx)
+			}
+
 			start := time.Now()
 
 			req, respDumper, reqBody, recoverReq := prepareReqAndResp(ctx, config)
