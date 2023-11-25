@@ -1,7 +1,9 @@
-github.com/adlandh/context-logger v1.0.1 h1:dLZaJGQfmvbZmCdaxJi2Gflg1QrzH1nk+ePhmUBTYxA=
-github.com/adlandh/context-logger v1.0.1/go.mod h1:pkPKZ2dAcHPlR1TVCLS28p3kgTDBazsnyhjprRk3wtw=
+github.com/adlandh/context-logger v1.1.0 h1:CykTRTUdJEO2wrGy8A/NUhkYHMDIvNl/yc8T2f/L09A=
+github.com/adlandh/context-logger v1.1.0/go.mod h1:pkPKZ2dAcHPlR1TVCLS28p3kgTDBazsnyhjprRk3wtw=
 github.com/adlandh/echo-otel-middleware v1.0.4 h1:snvGFCccrf6biJ8JPTCIphmjOMC8fN5tNGu8QS3NG2w=
 github.com/adlandh/echo-otel-middleware v1.0.4/go.mod h1:bFzFMpUuIRGIsy3X90VPJAlCWJBFEalLusQyNlnQi9Y=
+github.com/adlandh/echo-otel-middleware v1.0.5 h1:wB97UwiMmYD07Mw4QeA7t3h6X07Lhlnh/KW+nTeRv7U=
+github.com/adlandh/echo-otel-middleware v1.0.5/go.mod h1:bFzFMpUuIRGIsy3X90VPJAlCWJBFEalLusQyNlnQi9Y=
 github.com/adlandh/response-dumper v1.0.1 h1:U71jU9RATWSR9BX2Q+Mfqfn7pqhKaXRYaR5dpAVXm6M=
 github.com/adlandh/response-dumper v1.0.1/go.mod h1:qZwuAis9oi7Z1rhRMIhLZ5X7TUhxhgYZJnZC9AAYDD8=
 github.com/brianvoe/gofakeit/v6 v6.24.0 h1:74yq7RRz/noddscZHRS2T84oHZisW9muwbb8sRnU52A=
