@@ -3,7 +3,7 @@ module github.com/adlandh/echo-zap-middleware
 go 1.21
 
 require (
-	github.com/adlandh/context-logger v1.1.0
+	github.com/adlandh/context-logger v1.1.2
 	github.com/adlandh/echo-otel-middleware v1.0.5
 	github.com/adlandh/response-dumper v1.0.1
 	github.com/labstack/echo/v4 v4.11.3
@@ -15,6 +15,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/getsentry/sentry-go v0.25.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect

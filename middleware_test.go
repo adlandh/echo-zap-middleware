@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/zap"
 )
 
@@ -108,7 +109,7 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
 }
 
 func (s *MiddlewareTestSuite) TestWithOtelMiddleware() {
-	provider := trace.NewNoopTracerProvider()
+	provider := noop.NewTracerProvider()
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 	ctx := context.Background()
 	sc := trace.NewSpanContext(trace.SpanContextConfig{

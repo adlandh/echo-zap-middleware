@@ -58,7 +58,7 @@ func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareF
 		config.Skipper = middleware.DefaultSkipper
 	}
 
-	ctxLogger := contextlogger.WithContext(logger, contextlogger.WithOtelExtractor())
+	ctxLogger := contextlogger.WithContext(logger, contextlogger.WithOtelExtractor(), contextlogger.WithSentryExtractor())
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(ctx echo.Context) error {
