@@ -26,8 +26,8 @@ type MemorySink struct {
 // Implement Close and Sync as no-ops to satisfy the interface. The Write
 // method is provided by the embedded buffer.
 
-func (s *MemorySink) Close() error { return nil }
-func (s *MemorySink) Sync() error  { return nil }
+func (*MemorySink) Close() error { return nil }
+func (*MemorySink) Sync() error  { return nil }
 
 type MiddlewareTestSuite struct {
 	suite.Suite
