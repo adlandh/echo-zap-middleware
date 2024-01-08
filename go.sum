@@ -1,11 +1,11 @@
-github.com/adlandh/context-logger v1.2.0 h1:aqZVUlFWbbAO+N4lcHD5IsoBxYZx9oV22RTfIHXa96s=
-github.com/adlandh/context-logger v1.2.0/go.mod h1:iiGcHDCczDYoaW1wYRiXWlzwjcriUcAJI4hDuTQeXwc=
+github.com/adlandh/context-logger v1.2.1 h1:2Buhvtk0CDrDKZdRP2l6/P5k08BT2ImS3Vs7BhKwaHA=
+github.com/adlandh/context-logger v1.2.1/go.mod h1:IxKZuhbMxTpzk1xH9p5tIT583gLFwrx0L4Pb7qBei60=
 github.com/adlandh/echo-otel-middleware v1.0.5 h1:wB97UwiMmYD07Mw4QeA7t3h6X07Lhlnh/KW+nTeRv7U=
 github.com/adlandh/echo-otel-middleware v1.0.5/go.mod h1:bFzFMpUuIRGIsy3X90VPJAlCWJBFEalLusQyNlnQi9Y=
 github.com/adlandh/response-dumper v1.0.1 h1:U71jU9RATWSR9BX2Q+Mfqfn7pqhKaXRYaR5dpAVXm6M=
 github.com/adlandh/response-dumper v1.0.1/go.mod h1:qZwuAis9oi7Z1rhRMIhLZ5X7TUhxhgYZJnZC9AAYDD8=
-github.com/brianvoe/gofakeit/v6 v6.25.0 h1:ZpFjktOpLZUeF8q223o0rUuXtA+m5qW5srjvVi+JkXk=
-github.com/brianvoe/gofakeit/v6 v6.25.0/go.mod h1:Xj58BMSnFqcn/fAQeSK+/PLtC5kSb7FJIq4JyGa8vEs=
+github.com/brianvoe/gofakeit/v6 v6.26.3 h1:3ljYrjPwsUNAUFdUIr2jVg5EhKdcke/ZLop7uVg1Er8=
+github.com/brianvoe/gofakeit/v6 v6.26.3/go.mod h1:Xj58BMSnFqcn/fAQeSK+/PLtC5kSb7FJIq4JyGa8vEs=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/getsentry/sentry-go v0.25.0 h1:q6Eo+hS+yoJlTO3uu/azhQadsD8V+jQn2D8VvX1eOyI=
