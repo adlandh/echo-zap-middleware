@@ -1,10 +1,12 @@
 module github.com/adlandh/echo-zap-middleware
 
-go 1.21
+go 1.22
+
+toolchain go1.22.0
 
 require (
-	github.com/adlandh/context-logger v1.2.3
-	github.com/adlandh/echo-otel-middleware v1.0.7
+	github.com/adlandh/context-logger v1.2.4
+	github.com/adlandh/echo-otel-middleware v1.0.8
 	github.com/adlandh/response-dumper v1.0.1
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/stretchr/testify v1.8.4
