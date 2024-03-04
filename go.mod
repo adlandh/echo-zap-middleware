@@ -9,7 +9,7 @@ require (
 	github.com/adlandh/echo-otel-middleware v1.0.8
 	github.com/adlandh/response-dumper v1.0.1
 	github.com/labstack/echo/v4 v4.11.4
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/zap v1.27.0
