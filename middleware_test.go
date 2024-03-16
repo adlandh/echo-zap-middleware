@@ -56,6 +56,12 @@ func (s *MiddlewareTestSuite) SetupTest() {
 	s.router.Use(middleware.RequestID())
 }
 
+func (s *MiddlewareTestSuite) TearDownTest() {
+	s.Contains(s.sink.String(), "GET")
+	s.Contains(s.sink.String(), "/ping")
+	s.Contains(s.sink.String(), "request_id")
+}
+
 func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 	s.router.Use(Middleware(s.logger))
 	s.router.GET("/ping", func(c echo.Context) error {
@@ -71,9 +77,6 @@ func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 
 	response := w.Result()
 	s.Equal(http.StatusOK, response.StatusCode)
-	s.Contains(s.sink.String(), "GET")
-	s.Contains(s.sink.String(), "/ping")
-	s.Contains(s.sink.String(), "request_id")
 	s.NotContains(s.sink.String(), "body")
 	s.NotContains(s.sink.String(), "headers")
 	s.NotContains(s.sink.String(), "trace_id")
@@ -97,13 +100,10 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
 
 	response := w.Result()
 	s.Equal(http.StatusOK, response.StatusCode)
-	s.Contains(s.sink.String(), "GET")
-	s.Contains(s.sink.String(), "/ping")
-	s.Contains(s.sink.String(), "request_id")
-	s.Contains(s.sink.String(), "request body")
-	s.Contains(s.sink.String(), "request headers")
-	s.Contains(s.sink.String(), "response body")
-	s.Contains(s.sink.String(), "response headers")
+	s.Contains(s.sink.String(), "req.body")
+	s.Contains(s.sink.String(), "req.headers")
+	s.Contains(s.sink.String(), "resp.body")
+	s.Contains(s.sink.String(), "resp.headers")
 	s.NotContains(s.sink.String(), "trace_id")
 	s.NotContains(s.sink.String(), "span_id")
 }
@@ -135,9 +135,6 @@ func (s *MiddlewareTestSuite) TestWithOtelMiddleware() {
 	s.router.ServeHTTP(w, r)
 	response := w.Result()
 	s.Equal(http.StatusOK, response.StatusCode)
-	s.Contains(s.sink.String(), "GET")
-	s.Contains(s.sink.String(), "/ping")
-	s.Contains(s.sink.String(), "request_id")
 	s.Contains(s.sink.String(), "trace_id")
 	s.Contains(s.sink.String(), "span_id")
 }
