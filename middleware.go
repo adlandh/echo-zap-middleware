@@ -2,13 +2,9 @@
 package echozapmiddleware
 
 import (
-	"bytes"
-	"io"
-	"net/http"
 	"time"
 
 	contextlogger "github.com/adlandh/context-logger"
-	"github.com/adlandh/response-dumper"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -42,128 +38,76 @@ var (
 		AreHeadersDump: false,
 		IsBodyDump:     false,
 		LimitHTTPBody:  true,
-		LimitSize:      1024,
+		LimitSize:      500,
 	}
 )
 
-// Middleware returns a Zap Logger middleware with default config.
-func Middleware(logger *zap.Logger) echo.MiddlewareFunc {
-	return MiddlewareWithConfig(logger, DefaultZapConfig)
-}
-
-// MiddlewareWithConfig returns a Zap Logger middleware with config.
-// nolint:funlen,cyclop
-func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareFunc {
+// MiddlewareWithContextLogger returns a Zap Logger middleware with context logger.
+func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.MiddlewareFunc {
 	if config.Skipper == nil {
 		config.Skipper = middleware.DefaultSkipper
 	}
 
-	ctxLogger := contextlogger.WithContext(logger, contextlogger.WithOtelExtractor(), contextlogger.WithSentryExtractor())
-
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(ctx echo.Context) error {
-			if config.Skipper(ctx) || ctx.Request() == nil || ctx.Response() == nil {
-				return next(ctx)
+		return func(c echo.Context) error {
+			if config.Skipper(c) || c.Request() == nil || c.Response() == nil {
+				return next(c)
 			}
 
 			start := time.Now()
+			req := c.Request()
+			ctx := req.Context()
 
-			req, respDumper, reqBody, recoverReq := prepareReqAndResp(ctx, config)
-			defer recoverReq()
+			defer func() {
+				c.SetRequest(req.WithContext(ctx))
+			}()
 
-			err := next(ctx)
+			respDumper, reqBody := prepareReqAndResp(c, config)
+
+			err := next(c)
 			if err != nil {
-				ctx.Error(err)
+				c.Error(err)
 			}
 
-			res := ctx.Response()
-			id := getRequestID(ctx)
+			res := c.Response()
+
 			fields := []zapcore.Field{
 				zap.Int("status", res.Status),
 				zap.String("latency", time.Since(start).String()),
-				zap.String("request_id", id),
+				zap.String("request_id", getRequestID(c)),
 				zap.String("method", req.Method),
 				zap.String("uri", req.RequestURI),
 				zap.String("host", req.Host),
-				zap.String("remote_ip", ctx.RealIP()),
-			}
-			n := res.Status
-
-			switch {
-			case n >= 500:
-				ctxLogger.Ctx(req.Context()).Error("Server error", fields...)
-			case n >= 400:
-				ctxLogger.Ctx(req.Context()).Warn("Client error", fields...)
-			case n >= 300:
-				ctxLogger.Ctx(req.Context()).Info("Redirection", fields...)
-			default:
-				ctxLogger.Ctx(req.Context()).Info("Success", fields...)
+				zap.String("remote_ip", c.RealIP()),
 			}
 
-			if config.IsBodyDump || config.AreHeadersDump {
-				additionalFields := make([]zapcore.Field, 0, 5)
-				// add request id
-				additionalFields = append(additionalFields, zap.String("request_id", id))
-				// add headers
-				if config.AreHeadersDump {
-					additionalFields = append(additionalFields, zap.Any("request headers", req.Header), zap.Any("response headers", res.Header()))
-				}
-
-				// add body
-				if config.IsBodyDump {
-					additionalFields = append(additionalFields, zap.String("request body", limitString(config, string(reqBody))), zap.String("response body", limitString(config, respDumper.GetResponse())))
-				}
-
-				ctxLogger.Ctx(req.Context()).Debug("Additional info", additionalFields...)
+			// add headers
+			if config.AreHeadersDump {
+				fields = append(fields, zap.Any("req.headers", req.Header), zap.Any("resp.headers", res.Header()))
 			}
+
+			// add body
+			if config.IsBodyDump {
+				fields = append(fields, zap.String("req.body", limitString(config, string(reqBody))),
+					zap.String("resp.body", limitString(config, respDumper.GetResponse())))
+			}
+
+			log(res.Status, ctxLogger.Ctx(ctx), fields)
 
 			return nil
 		}
 	}
 }
 
-func prepareReqAndResp(ctx echo.Context, config ZapConfig) (*http.Request, *response.Dumper, []byte, func()) {
-	var respDumper *response.Dumper
-
-	var reqBody []byte
-
-	req := ctx.Request()
-	savedCtx := req.Context()
-
-	if config.IsBodyDump {
-		if req.Body != nil {
-			var err error
-
-			reqBody, err = io.ReadAll(req.Body)
-			if err == nil {
-				_ = req.Body.Close()
-				req.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // reset original request body
-			}
-		}
-
-		respDumper = response.NewDumper(ctx.Response())
-		ctx.Response().Writer = respDumper
-	}
-
-	return req, respDumper, reqBody, func() {
-		ctx.SetRequest(req.WithContext(savedCtx))
-	}
+// MiddlewareWithConfig returns a Zap Logger middleware with config.
+func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareFunc {
+	return MiddlewareWithContextLogger(
+		contextlogger.WithContext(logger, contextlogger.WithOtelExtractor(), contextlogger.WithSentryExtractor()),
+		config,
+	)
 }
 
-func limitString(config ZapConfig, str string) string {
-	if !config.LimitHTTPBody || len(str) <= config.LimitSize {
-		return str
-	}
-
-	return str[:config.LimitSize-3] + "..."
-}
-
-func getRequestID(ctx echo.Context) string {
-	requestID := ctx.Request().Header.Get(echo.HeaderXRequestID) // request-id generated by reverse-proxy
-	if requestID == "" {
-		// missed request-id from proxy, got generated one by middleware.RequestID()
-		requestID = ctx.Response().Header().Get(echo.HeaderXRequestID)
-	}
-
-	return requestID
+// Middleware returns a Zap Logger middleware with default config.
+func Middleware(logger *zap.Logger) echo.MiddlewareFunc {
+	return MiddlewareWithConfig(logger, DefaultZapConfig)
 }
