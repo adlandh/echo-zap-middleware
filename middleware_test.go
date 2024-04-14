@@ -94,7 +94,7 @@ func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 	s.NotContains(s.sink.String(), "request_id_from_context")
 }
 func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
-	s.router.Use(MiddlewareWithConfig(s.logger, ZapConfig{
+	s.router.Use(Middleware(s.logger, ZapConfig{
 		AreHeadersDump: true,
 		IsBodyDump:     true,
 	}))
@@ -123,10 +123,7 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 	s.router.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		RequestIDHandler: requestID.Saver,
 	}))
-	s.router.Use(MiddlewareWithContextLogger(s.ctxLogger, ZapConfig{
-		AreHeadersDump: true,
-		IsBodyDump:     true,
-	}))
+	s.router.Use(MiddlewareWithContextLogger(s.ctxLogger))
 	s.router.GET("/ping", func(c echo.Context) error {
 		// Assert we don't have a span on the context.
 		span := trace.SpanFromContext(c.Request().Context())
@@ -140,10 +137,8 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 
 	response := w.Result()
 	s.Equal(http.StatusOK, response.StatusCode)
-	s.Contains(s.sink.String(), "req.body")
-	s.Contains(s.sink.String(), "req.headers")
-	s.Contains(s.sink.String(), "resp.body")
-	s.Contains(s.sink.String(), "resp.headers")
+	s.NotContains(s.sink.String(), "body")
+	s.NotContains(s.sink.String(), "headers")
 	s.Contains(s.sink.String(), "request_id_from_context")
 }
 
