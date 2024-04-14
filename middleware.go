@@ -102,7 +102,7 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 // MiddlewareWithConfig returns a Zap Logger middleware with config.
 func MiddlewareWithConfig(logger *zap.Logger, config ZapConfig) echo.MiddlewareFunc {
 	return MiddlewareWithContextLogger(
-		contextlogger.WithContext(logger, contextlogger.WithOtelExtractor(), contextlogger.WithSentryExtractor()),
+		contextlogger.WithContext(logger),
 		config,
 	)
 }
