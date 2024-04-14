@@ -32,7 +32,7 @@ func main() {
 	app := echo.New()
 
 	// Add middleware
-	app.Use(echo_zap_middleware.MiddlewareWithConfig(
+	app.Use(echo_zap_middleware.Middleware(
 		logger,
 		echo_zap_middleware.ZapConfig{
 			// if you would like to save your request or response headers as tags, set AreHeadersDump to true
