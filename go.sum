@@ -1,5 +1,7 @@
 github.com/adlandh/context-logger v1.3.1 h1:VKDlS9NUlvioh8RAVQU1HqnEF/3cNwwle5hDk3rPS6o=
 github.com/adlandh/context-logger v1.3.1/go.mod h1:Rb7hVxdrUw3uzeKwVdGkcRkMVa5aE7rVT27EqjqPCXw=
+github.com/adlandh/context-logger v1.3.2 h1:9AQppJ0zAsrJ98IJscWTJg5XDJSgc0ZWdBmO5WeM/JI=
+github.com/adlandh/context-logger v1.3.2/go.mod h1:Rb7hVxdrUw3uzeKwVdGkcRkMVa5aE7rVT27EqjqPCXw=
 github.com/adlandh/response-dumper v1.0.1 h1:U71jU9RATWSR9BX2Q+Mfqfn7pqhKaXRYaR5dpAVXm6M=
 github.com/adlandh/response-dumper v1.0.1/go.mod h1:qZwuAis9oi7Z1rhRMIhLZ5X7TUhxhgYZJnZC9AAYDD8=
 github.com/brianvoe/gofakeit/v6 v6.24.0 h1:74yq7RRz/noddscZHRS2T84oHZisW9muwbb8sRnU52A=
