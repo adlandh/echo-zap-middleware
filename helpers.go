@@ -28,7 +28,7 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 			}
 		}
 
-		respDumper = response.NewDumper(c.Response())
+		respDumper = response.NewDumper(c.Response().Writer)
 		c.Response().Writer = respDumper
 	}
 

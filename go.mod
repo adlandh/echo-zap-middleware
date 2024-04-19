@@ -6,8 +6,8 @@ toolchain go1.22.0
 
 require (
 	github.com/adlandh/context-logger v1.3.2
-	github.com/adlandh/response-dumper v1.0.1
-	github.com/labstack/echo/v4 v4.11.4
+	github.com/adlandh/response-dumper v1.1.0
+	github.com/labstack/echo/v4 v4.12.0
 	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/otel/trace v1.25.0
 	go.uber.org/zap v1.27.0
