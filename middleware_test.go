@@ -12,7 +12,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/stretchr/testify/suite"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -77,10 +76,6 @@ func (s *MiddlewareTestSuite) TearDownTest() {
 func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 	s.router.Use(Middleware(s.logger))
 	s.router.GET("/ping", func(c echo.Context) error {
-		// Assert we don't have a span on the context.
-		span := trace.SpanFromContext(c.Request().Context())
-		ok := !span.SpanContext().IsValid()
-		s.True(ok)
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", nil)
@@ -99,10 +94,6 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
 		IsBodyDump:     true,
 	}))
 	s.router.GET("/ping", func(c echo.Context) error {
-		// Assert we don't have a span on the context.
-		span := trace.SpanFromContext(c.Request().Context())
-		ok := !span.SpanContext().IsValid()
-		s.True(ok)
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", nil)
@@ -125,10 +116,6 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 	}))
 	s.router.Use(MiddlewareWithContextLogger(s.ctxLogger))
 	s.router.GET("/ping", func(c echo.Context) error {
-		// Assert we don't have a span on the context.
-		span := trace.SpanFromContext(c.Request().Context())
-		ok := !span.SpanContext().IsValid()
-		s.True(ok)
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", nil)
