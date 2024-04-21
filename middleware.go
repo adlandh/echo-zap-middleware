@@ -5,6 +5,7 @@ import (
 	"time"
 
 	contextlogger "github.com/adlandh/context-logger"
+	"github.com/adlandh/response-dumper"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -42,16 +43,7 @@ var (
 	}
 )
 
-// MiddlewareWithContextLogger returns a Zap Logger middleware with context logger.
-func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config ...ZapConfig) echo.MiddlewareFunc {
-	if len(config) == 0 {
-		config = append(config, DefaultZapConfig)
-	}
-
-	if config[0].Skipper == nil {
-		config[0].Skipper = middleware.DefaultSkipper
-	}
-
+func makeHandler(ctxLogger *contextlogger.ContextLogger, config []ZapConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if config[0].Skipper(c) || c.Request() == nil || c.Response() == nil {
@@ -62,11 +54,17 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 			req := c.Request()
 			ctx := req.Context()
 
-			defer func() {
-				c.SetRequest(req.WithContext(ctx))
-			}()
+			var respDumper *response.Dumper
 
-			respDumper, reqBody := prepareReqAndResp(c, config[0])
+			var reqBody []byte
+
+			if config[0].IsBodyDump {
+				defer func() {
+					c.SetRequest(req.WithContext(ctx))
+				}()
+
+				respDumper, reqBody = prepareReqAndResp(c, config[0])
+			}
 
 			err := next(c)
 			if err != nil {
@@ -103,12 +101,21 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 	}
 }
 
+// MiddlewareWithContextLogger returns a Zap Logger middleware with context logger.
+func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config ...ZapConfig) echo.MiddlewareFunc {
+	if len(config) == 0 {
+		config = []ZapConfig{DefaultZapConfig}
+	}
+
+	if config[0].Skipper == nil {
+		config[0].Skipper = middleware.DefaultSkipper
+	}
+
+	return makeHandler(ctxLogger, config)
+}
+
 // Middleware returns a Zap Logger middleware with config.
 // If config is not passed, DefaultZapConfig will be used.
 func Middleware(logger *zap.Logger, config ...ZapConfig) echo.MiddlewareFunc {
-	if len(config) == 0 {
-		config = append(config, DefaultZapConfig)
-	}
-
-	return MiddlewareWithContextLogger(contextlogger.WithContext(logger), config[0])
+	return MiddlewareWithContextLogger(contextlogger.WithContext(logger), config...)
 }
