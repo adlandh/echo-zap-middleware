@@ -2,6 +2,8 @@
 package echozapmiddleware
 
 import (
+	"net/http"
+	"regexp"
 	"time"
 
 	contextlogger "github.com/adlandh/context-logger"
@@ -18,6 +20,12 @@ type (
 		// Skipper defines a function to skip middleware.
 		Skipper middleware.Skipper
 
+		// paths to exclude from dumping response bodies (regular expressions)
+		DumpNoResponseBodyForPaths []string
+
+		// paths to exclude from dumping request bodies (regular expressions)
+		DumpNoRequestBodyForPaths []string
+
 		// add req headers & resp headers to tracing tags
 		AreHeadersDump bool
 
@@ -32,6 +40,8 @@ type (
 	}
 )
 
+var regexExcludedPathsReq, regexExcludedPathsResp []*regexp.Regexp
+
 var (
 	// DefaultZapConfig is the default Zap Logger middleware config.
 	DefaultZapConfig = ZapConfig{
@@ -43,10 +53,12 @@ var (
 	}
 )
 
-func makeHandler(ctxLogger *contextlogger.ContextLogger, config []ZapConfig) echo.MiddlewareFunc {
+func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.MiddlewareFunc {
+	prepareRegexs(ctxLogger, config)
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if config[0].Skipper(c) || c.Request() == nil || c.Response() == nil {
+			if config.Skipper(c) || c.Request() == nil || c.Response() == nil {
 				return next(c)
 			}
 
@@ -58,12 +70,12 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config []ZapConfig) ech
 
 			var reqBody []byte
 
-			if config[0].IsBodyDump {
+			if config.IsBodyDump {
 				defer func() {
 					c.SetRequest(req.WithContext(ctx))
 				}()
 
-				respDumper, reqBody = prepareReqAndResp(c, config[0])
+				respDumper, reqBody = prepareReqAndResp(c, config)
 			}
 
 			err := next(c)
@@ -84,21 +96,51 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config []ZapConfig) ech
 			}
 
 			// add headers
-			if config[0].AreHeadersDump {
-				fields = append(fields, zap.Any("req.headers", req.Header), zap.Any("resp.headers", res.Header()))
-			}
+			fields = append(fields, addHeaders(config, req, res)...)
 
 			// add body
-			if config[0].IsBodyDump {
-				fields = append(fields, zap.String("req.body", limitString(config[0], string(reqBody))),
-					zap.String("resp.body", limitString(config[0], respDumper.GetResponse())))
-			}
+			fields = append(fields, addBody(config, reqBody, req, respDumper)...)
 
 			log(res.Status, ctxLogger.Ctx(ctx), fields)
 
 			return nil
 		}
 	}
+}
+
+func addHeaders(config ZapConfig, req *http.Request, res *echo.Response) []zapcore.Field {
+	if !config.AreHeadersDump {
+		return nil
+	}
+
+	return []zapcore.Field{
+		zap.Any("req.headers", req.Header),
+		zap.Any("resp.headers", res.Header()),
+	}
+}
+
+func addBody(config ZapConfig, reqBody []byte, req *http.Request, respDumper *response.Dumper) []zapcore.Field {
+	if !config.IsBodyDump {
+		return nil
+	}
+
+	var fields []zapcore.Field
+
+	body := limitString(config, string(reqBody))
+	if isExcluded(req.URL.Path, regexExcludedPathsReq) && len(body) > 0 {
+		body = "[excluded]"
+	}
+
+	fields = append(fields, zap.String("req.body", body))
+
+	body = limitString(config, respDumper.GetResponse())
+	if isExcluded(req.URL.Path, regexExcludedPathsResp) && len(body) > 0 {
+		body = "[excluded]"
+	}
+
+	fields = append(fields, zap.String("resp.body", body))
+
+	return fields
 }
 
 // MiddlewareWithContextLogger returns a Zap Logger middleware with context logger.
@@ -111,7 +153,7 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 		config[0].Skipper = middleware.DefaultSkipper
 	}
 
-	return makeHandler(ctxLogger, config)
+	return makeHandler(ctxLogger, config[0])
 }
 
 // Middleware returns a Zap Logger middleware with config.

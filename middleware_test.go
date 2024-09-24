@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	contextlogger "github.com/adlandh/context-logger"
@@ -71,6 +72,85 @@ func (s *MiddlewareTestSuite) TearDownTest() {
 	s.Contains(s.sink.String(), "GET")
 	s.Contains(s.sink.String(), "/ping")
 	s.Contains(s.sink.String(), "request_id")
+}
+
+func (s *MiddlewareTestSuite) TestWithExcludedPath() {
+	s.Run("invalid regex resp", func() {
+		s.router.Use(Middleware(s.logger, ZapConfig{
+			DumpNoResponseBodyForPaths: []string{
+				"[0-9]++",
+			},
+			IsBodyDump: true,
+		}))
+		s.router.GET("/ping", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
+		r := httptest.NewRequest("GET", "/ping", nil)
+		w := httptest.NewRecorder()
+		s.router.ServeHTTP(w, r)
+
+		response := w.Result()
+		s.Equal(http.StatusOK, response.StatusCode)
+		s.Contains(s.sink.String(), "error to compile regex")
+	})
+	s.Run("invalid regex req", func() {
+		s.router.Use(Middleware(s.logger, ZapConfig{
+			DumpNoRequestBodyForPaths: []string{
+				"[0-9]++",
+			},
+			IsBodyDump: true,
+		}))
+		s.router.GET("/ping", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
+		r := httptest.NewRequest("GET", "/ping", nil)
+		w := httptest.NewRecorder()
+		s.router.ServeHTTP(w, r)
+
+		response := w.Result()
+		s.Equal(http.StatusOK, response.StatusCode)
+		s.Contains(s.sink.String(), "error to compile regex")
+	})
+
+	s.Run("exclude ping from resp", func() {
+		s.router.Use(Middleware(s.logger, ZapConfig{
+			DumpNoResponseBodyForPaths: []string{
+				"ping",
+			},
+			IsBodyDump: true,
+		}))
+		s.router.GET("/ping", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
+		r := httptest.NewRequest("GET", "/ping", strings.NewReader("test"))
+		w := httptest.NewRecorder()
+		s.router.ServeHTTP(w, r)
+
+		response := w.Result()
+		s.Equal(http.StatusOK, response.StatusCode)
+		s.Contains(s.sink.String(), "\"resp.body\": \"[excluded]\"")
+		s.Contains(s.sink.String(), "\"req.body\": \"test\"")
+	})
+
+	s.Run("exclude ping from req", func() {
+		s.router.Use(Middleware(s.logger, ZapConfig{
+			DumpNoRequestBodyForPaths: []string{
+				"ping",
+			},
+			IsBodyDump: true,
+		}))
+		s.router.GET("/ping", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
+		r := httptest.NewRequest("GET", "/ping", strings.NewReader("test"))
+		w := httptest.NewRecorder()
+		s.router.ServeHTTP(w, r)
+
+		response := w.Result()
+		s.Equal(http.StatusOK, response.StatusCode)
+		s.Contains(s.sink.String(), "\"resp.body\": \"ok\"")
+		s.Contains(s.sink.String(), "\"req.body\": \"[excluded]\"")
+	})
 }
 
 func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
