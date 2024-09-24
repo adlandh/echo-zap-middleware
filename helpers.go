@@ -2,8 +2,11 @@ package echozapmiddleware
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"regexp"
 
+	contextlogger "github.com/adlandh/context-logger"
 	"github.com/adlandh/response-dumper"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
@@ -63,5 +66,51 @@ func log(status int, logger *zap.Logger, fields []zapcore.Field) {
 		logger.Info("Redirection", fields...)
 	default:
 		logger.Info("Success", fields...)
+	}
+}
+
+func isExcluded(path string, regexs []*regexp.Regexp) bool {
+	if len(regexs) > 0 {
+		for _, regexExcludedPath := range regexs {
+			if regexExcludedPath.MatchString(path) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func prepareRegexs(ctxLogger *contextlogger.ContextLogger, config ZapConfig) {
+	if !config.IsBodyDump {
+		return
+	}
+
+	if len(config.DumpNoResponseBodyForPaths) > 0 {
+		regexExcludedPathsResp = make([]*regexp.Regexp, 0, len(config.DumpNoResponseBodyForPaths))
+
+		for _, path := range config.DumpNoResponseBodyForPaths {
+			regexExcludedPath, err := regexp.Compile(path)
+			if err != nil {
+				ctxLogger.Ctx(context.Background()).Error("error to compile regex", zap.String("path", path), zap.Error(err))
+				continue
+			}
+
+			regexExcludedPathsResp = append(regexExcludedPathsResp, regexExcludedPath)
+		}
+	}
+
+	if len(config.DumpNoRequestBodyForPaths) > 0 {
+		regexExcludedPathsReq = make([]*regexp.Regexp, 0, len(config.DumpNoRequestBodyForPaths))
+
+		for _, path := range config.DumpNoRequestBodyForPaths {
+			regexExcludedPath, err := regexp.Compile(path)
+			if err != nil {
+				ctxLogger.Ctx(context.Background()).Error("error to compile regex", zap.String("path", path), zap.Error(err))
+				continue
+			}
+
+			regexExcludedPathsReq = append(regexExcludedPathsReq, regexExcludedPath)
+		}
 	}
 }
