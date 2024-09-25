@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"unicode/utf8"
 
 	contextlogger "github.com/adlandh/context-logger"
 	"github.com/adlandh/response-dumper"
@@ -39,12 +40,41 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 	return respDumper, reqBody
 }
 
-func limitString(config ZapConfig, str string) string {
-	if !config.LimitHTTPBody || len(str) <= config.LimitSize {
+func limitString(str string, size int) string {
+	if len(str) <= size {
 		return str
 	}
 
-	return str[:config.LimitSize-3] + "..."
+	bytes := []byte(str)
+
+	if len(bytes) <= size {
+		return str
+	}
+
+	validBytes := bytes[:size]
+	for !utf8.Valid(validBytes) {
+		validBytes = validBytes[:len(validBytes)-1]
+	}
+
+	return string(validBytes)
+}
+
+func limitStringWithDots(str string, size int) string {
+	if size <= 10 {
+		return limitString(str, size)
+	}
+
+	result := limitString(str, size-3)
+
+	return result + "..."
+}
+
+func limitBody(config ZapConfig, str string) string {
+	if !config.LimitHTTPBody {
+		return str
+	}
+
+	return limitStringWithDots(str, config.LimitSize)
 }
 
 func getRequestID(ctx echo.Context) string {
@@ -142,14 +172,14 @@ func addBody(config ZapConfig, path string, endpoint string, reqBody string, res
 
 	var fields []zapcore.Field
 
-	body := limitString(config, reqBody)
+	body := limitBody(config, reqBody)
 	if len(body) > 0 && isExcluded(path, endpoint, regexExcludedPathsReq, config.DumpNoRequestBodyForPaths) {
 		body = "[excluded]"
 	}
 
 	fields = append(fields, zap.String("req.body", body))
 
-	body = limitString(config, respDumper.GetResponse())
+	body = limitBody(config, respDumper.GetResponse())
 	if len(body) > 0 && isExcluded(path, endpoint, regexExcludedPathsResp, config.DumpNoResponseBodyForPaths) {
 		body = "[excluded]"
 	}
