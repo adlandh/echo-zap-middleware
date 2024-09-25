@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
 	"regexp"
 
 	contextlogger "github.com/adlandh/context-logger"
@@ -121,4 +122,39 @@ func prepareRegexs(ctxLogger *contextlogger.ContextLogger, config ZapConfig) {
 			regexExcludedPathsReq = append(regexExcludedPathsReq, regexExcludedPath)
 		}
 	}
+}
+
+func addHeaders(config ZapConfig, reqHeaders http.Header, resHeaders http.Header) []zapcore.Field {
+	if !config.AreHeadersDump {
+		return nil
+	}
+
+	return []zapcore.Field{
+		zap.Any("req.headers", reqHeaders),
+		zap.Any("resp.headers", resHeaders),
+	}
+}
+
+func addBody(config ZapConfig, path string, endpoint string, reqBody string, respDumper *response.Dumper) []zapcore.Field {
+	if !config.IsBodyDump {
+		return nil
+	}
+
+	var fields []zapcore.Field
+
+	body := limitString(config, reqBody)
+	if len(body) > 0 && isExcluded(path, endpoint, regexExcludedPathsReq, config.DumpNoRequestBodyForPaths) {
+		body = "[excluded]"
+	}
+
+	fields = append(fields, zap.String("req.body", body))
+
+	body = limitString(config, respDumper.GetResponse())
+	if len(body) > 0 && isExcluded(path, endpoint, regexExcludedPathsResp, config.DumpNoResponseBodyForPaths) {
+		body = "[excluded]"
+	}
+
+	fields = append(fields, zap.String("resp.body", body))
+
+	return fields
 }
