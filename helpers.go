@@ -65,6 +65,9 @@ func limitStringWithDots(str string, size int) string {
 	}
 
 	result := limitString(str, size-3)
+	if result == str {
+		return str
+	}
 
 	return result + "..."
 }
