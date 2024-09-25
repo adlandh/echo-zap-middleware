@@ -56,7 +56,7 @@ func getRequestID(ctx echo.Context) string {
 	return requestID
 }
 
-func log(status int, logger *zap.Logger, fields []zapcore.Field) {
+func logit(status int, logger *zap.Logger, fields []zapcore.Field) {
 	switch {
 	case status >= 500:
 		logger.Error("Server error", fields...)
@@ -69,7 +69,15 @@ func log(status int, logger *zap.Logger, fields []zapcore.Field) {
 	}
 }
 
-func isExcluded(path string, regexs []*regexp.Regexp) bool {
+func isExcluded(path string, endpoint string, regexs []*regexp.Regexp, endpoints []string) bool {
+	if len(endpoints) > 0 {
+		for _, endpointExcluded := range endpoints {
+			if endpointExcluded == endpoint {
+				return true
+			}
+		}
+	}
+
 	if len(regexs) > 0 {
 		for _, regexExcludedPath := range regexs {
 			if regexExcludedPath.MatchString(path) {
@@ -82,17 +90,19 @@ func isExcluded(path string, regexs []*regexp.Regexp) bool {
 }
 
 func prepareRegexs(ctxLogger *contextlogger.ContextLogger, config ZapConfig) {
+	regexExcludedPathsResp = make([]*regexp.Regexp, 0, len(config.DumpNoResponseBodyForPaths))
+	regexExcludedPathsReq = make([]*regexp.Regexp, 0, len(config.DumpNoRequestBodyForPaths))
+
 	if !config.IsBodyDump {
 		return
 	}
 
 	if len(config.DumpNoResponseBodyForPaths) > 0 {
-		regexExcludedPathsResp = make([]*regexp.Regexp, 0, len(config.DumpNoResponseBodyForPaths))
-
 		for _, path := range config.DumpNoResponseBodyForPaths {
 			regexExcludedPath, err := regexp.Compile(path)
 			if err != nil {
-				ctxLogger.Ctx(context.Background()).Error("error to compile regex", zap.String("path", path), zap.Error(err))
+				// Just warn and continue
+				ctxLogger.Ctx(context.Background()).Warn("error to compile regex", zap.String("path", path), zap.Error(err))
 				continue
 			}
 
@@ -101,12 +111,10 @@ func prepareRegexs(ctxLogger *contextlogger.ContextLogger, config ZapConfig) {
 	}
 
 	if len(config.DumpNoRequestBodyForPaths) > 0 {
-		regexExcludedPathsReq = make([]*regexp.Regexp, 0, len(config.DumpNoRequestBodyForPaths))
-
 		for _, path := range config.DumpNoRequestBodyForPaths {
 			regexExcludedPath, err := regexp.Compile(path)
 			if err != nil {
-				ctxLogger.Ctx(context.Background()).Error("error to compile regex", zap.String("path", path), zap.Error(err))
+				ctxLogger.Ctx(context.Background()).Warn("error to compile regex", zap.String("path", path), zap.Error(err))
 				continue
 			}
 
