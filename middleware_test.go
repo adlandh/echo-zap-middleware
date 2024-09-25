@@ -76,6 +76,9 @@ func (s *MiddlewareTestSuite) TearDownTest() {
 
 func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 	s.Run("invalid regex resp", func() {
+		s.sink.Reset()
+		s.router = echo.New()
+		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
 			DumpNoResponseBodyForPaths: []string{
 				"[0-9]++",
@@ -94,6 +97,9 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 		s.Contains(s.sink.String(), "error to compile regex")
 	})
 	s.Run("invalid regex req", func() {
+		s.sink.Reset()
+		s.router = echo.New()
+		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
 			DumpNoRequestBodyForPaths: []string{
 				"[0-9]++",
@@ -113,16 +119,19 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 	})
 
 	s.Run("exclude ping from resp", func() {
+		s.sink.Reset()
+		s.router = echo.New()
+		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
 			DumpNoResponseBodyForPaths: []string{
-				"ping",
+				"^\\/ping\\/121",
 			},
 			IsBodyDump: true,
 		}))
-		s.router.GET("/ping", func(c echo.Context) error {
+		s.router.GET("/ping/:id", func(c echo.Context) error {
 			return c.String(http.StatusOK, "ok")
 		})
-		r := httptest.NewRequest("GET", "/ping", strings.NewReader("test"))
+		r := httptest.NewRequest("GET", "/ping/121?sdsdds=1212", strings.NewReader("test"))
 		w := httptest.NewRecorder()
 		s.router.ServeHTTP(w, r)
 
@@ -133,16 +142,19 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 	})
 
 	s.Run("exclude ping from req", func() {
+		s.sink.Reset()
+		s.router = echo.New()
+		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
 			DumpNoRequestBodyForPaths: []string{
-				"ping",
+				"/ping/:id",
 			},
 			IsBodyDump: true,
 		}))
-		s.router.GET("/ping", func(c echo.Context) error {
+		s.router.GET("/ping/:id", func(c echo.Context) error {
 			return c.String(http.StatusOK, "ok")
 		})
-		r := httptest.NewRequest("GET", "/ping", strings.NewReader("test"))
+		r := httptest.NewRequest("GET", "/ping/123", strings.NewReader("test"))
 		w := httptest.NewRecorder()
 		s.router.ServeHTTP(w, r)
 
