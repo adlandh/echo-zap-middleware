@@ -20,10 +20,10 @@ type (
 		// Skipper defines a function to skip middleware.
 		Skipper middleware.Skipper
 
-		// paths to exclude from dumping response bodies (regular expressions)
+		// paths (regular expressions) or endpoints (ex: `/ping/:id`) to exclude from dumping response bodies
 		DumpNoResponseBodyForPaths []string
 
-		// paths to exclude from dumping request bodies (regular expressions)
+		// paths (regular expressions) or endpoints (ex: `/ping/:id`) to exclude from dumping request bodies (regular expressions)
 		DumpNoRequestBodyForPaths []string
 
 		// add req headers & resp headers to tracing tags
@@ -99,9 +99,9 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 			fields = append(fields, addHeaders(config, req, res)...)
 
 			// add body
-			fields = append(fields, addBody(config, reqBody, req, respDumper)...)
+			fields = append(fields, addBody(config, c, reqBody, req, respDumper)...)
 
-			log(res.Status, ctxLogger.Ctx(ctx), fields)
+			logit(res.Status, ctxLogger.Ctx(ctx), fields)
 
 			return nil
 		}
@@ -119,7 +119,7 @@ func addHeaders(config ZapConfig, req *http.Request, res *echo.Response) []zapco
 	}
 }
 
-func addBody(config ZapConfig, reqBody []byte, req *http.Request, respDumper *response.Dumper) []zapcore.Field {
+func addBody(config ZapConfig, c echo.Context, reqBody []byte, req *http.Request, respDumper *response.Dumper) []zapcore.Field {
 	if !config.IsBodyDump {
 		return nil
 	}
@@ -127,14 +127,14 @@ func addBody(config ZapConfig, reqBody []byte, req *http.Request, respDumper *re
 	var fields []zapcore.Field
 
 	body := limitString(config, string(reqBody))
-	if isExcluded(req.URL.Path, regexExcludedPathsReq) && len(body) > 0 {
+	if len(body) > 0 && isExcluded(req.URL.Path, c.Path(), regexExcludedPathsReq, config.DumpNoRequestBodyForPaths) {
 		body = "[excluded]"
 	}
 
 	fields = append(fields, zap.String("req.body", body))
 
 	body = limitString(config, respDumper.GetResponse())
-	if isExcluded(req.URL.Path, regexExcludedPathsResp) && len(body) > 0 {
+	if len(body) > 0 && isExcluded(req.URL.Path, c.Path(), regexExcludedPathsResp, config.DumpNoResponseBodyForPaths) {
 		body = "[excluded]"
 	}
 
