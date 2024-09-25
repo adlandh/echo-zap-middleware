@@ -39,15 +39,17 @@ func main() {
 			AreHeadersDump: true,
 			// if you would like to save your request or response body as tags, set IsBodyDump to true
 			IsBodyDump: true,
+			// No dump for /pong
+			DumpNoResponseBodyForPaths: []string{"/pong"},
 		}))
 
 	// Add some endpoints
-	app.POST("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
+	app.GET("/ping", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Hello, World, from Ping!")
 	})
 
-	app.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
+	app.GET("/pong", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Hello, World, from Pong!")
 	})
 
 	// And run it
