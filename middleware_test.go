@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -75,58 +76,20 @@ func (s *MiddlewareTestSuite) TearDownTest() {
 }
 
 func (s *MiddlewareTestSuite) TestWithExcludedPath() {
-	s.Run("invalid regex resp", func() {
-		s.sink.Reset()
-		s.router = echo.New()
-		s.router.Use(middleware.RequestID())
-		s.router.Use(Middleware(s.logger, ZapConfig{
-			DumpNoResponseBodyForPaths: []string{
-				"[0-9]++",
-			},
-			IsBodyDump: true,
-		}))
-		s.router.GET("/ping", func(c echo.Context) error {
-			return c.String(http.StatusOK, "ok")
-		})
-		r := httptest.NewRequest("GET", "/ping", nil)
-		w := httptest.NewRecorder()
-		s.router.ServeHTTP(w, r)
-
-		response := w.Result()
-		s.Equal(http.StatusOK, response.StatusCode)
-		s.Contains(s.sink.String(), "error to compile regex")
-	})
-	s.Run("invalid regex req", func() {
-		s.sink.Reset()
-		s.router = echo.New()
-		s.router.Use(middleware.RequestID())
-		s.router.Use(Middleware(s.logger, ZapConfig{
-			DumpNoRequestBodyForPaths: []string{
-				"[0-9]++",
-			},
-			IsBodyDump: true,
-		}))
-		s.router.GET("/ping", func(c echo.Context) error {
-			return c.String(http.StatusOK, "ok")
-		})
-		r := httptest.NewRequest("GET", "/ping", nil)
-		w := httptest.NewRecorder()
-		s.router.ServeHTTP(w, r)
-
-		response := w.Result()
-		s.Equal(http.StatusOK, response.StatusCode)
-		s.Contains(s.sink.String(), "error to compile regex")
-	})
-
 	s.Run("exclude ping from resp", func() {
+		rx := regexp.MustCompile("^/ping/121")
 		s.sink.Reset()
 		s.router = echo.New()
 		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
-			DumpNoResponseBodyForPaths: []string{
-				"^\\/ping\\/121",
-			},
 			IsBodyDump: true,
+			BodySkipper: func(c echo.Context) (skipReq, skipResp bool) {
+				if rx.MatchString(c.Request().URL.Path) {
+					return false, true
+				}
+
+				return
+			},
 		}))
 		s.router.GET("/ping/:id", func(c echo.Context) error {
 			return c.String(http.StatusOK, "ok")
@@ -146,10 +109,14 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 		s.router = echo.New()
 		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
-			DumpNoRequestBodyForPaths: []string{
-				"/ping/:id",
-			},
 			IsBodyDump: true,
+			BodySkipper: func(c echo.Context) (skipReq, skipResp bool) {
+				if c.Path() == "/ping/:id" {
+					return true, false
+				}
+
+				return
+			},
 		}))
 		s.router.GET("/ping/:id", func(c echo.Context) error {
 			return c.String(http.StatusOK, "ok")
@@ -169,15 +136,12 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 		s.router = echo.New()
 		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
-			DumpNoResponseBodyForPaths: []string{
-				"^\\/ping\\/121",
-			},
 			IsBodyDump: true,
-			BodySkipper: func(c echo.Context) bool {
+			BodySkipper: func(c echo.Context) (bool, bool) {
 				if c.Request().Header.Get("Content-Encoding") == "gzip" {
-					return true
+					return true, true
 				}
-				return false
+				return false, false
 			},
 		}))
 		s.router.GET("/ping/:id", func(c echo.Context) error {
