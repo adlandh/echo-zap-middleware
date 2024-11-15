@@ -45,13 +45,13 @@ func limitString(str string, size int) string {
 		return str
 	}
 
-	bytes := []byte(str)
+	strBytes := []byte(str)
 
-	if len(bytes) <= size {
+	if len(strBytes) <= size {
 		return str
 	}
 
-	validBytes := bytes[:size]
+	validBytes := strBytes[:size]
 	for !utf8.Valid(validBytes) {
 		validBytes = validBytes[:len(validBytes)-1]
 	}
@@ -168,22 +168,23 @@ func addHeaders(config ZapConfig, reqHeaders http.Header, resHeaders http.Header
 	}
 }
 
-func addBody(config ZapConfig, path string, endpoint string, reqBody string, respDumper *response.Dumper) []zapcore.Field {
-	if !config.IsBodyDump {
+func addBody(config ZapConfig, c echo.Context, reqBody string, respDumper *response.Dumper) []zapcore.Field {
+	if !config.IsBodyDump || config.BodySkipper == nil {
 		return nil
 	}
 
 	var fields []zapcore.Field
 
 	body := limitBody(config, reqBody)
-	if len(body) > 0 && isExcluded(path, endpoint, regexExcludedPathsReq, config.DumpNoRequestBodyForPaths) {
+	if len(body) > 0 &&
+		(config.BodySkipper(c) || isExcluded(c.Request().URL.Path, c.Path(), regexExcludedPathsReq, config.DumpNoRequestBodyForPaths)) {
 		body = "[excluded]"
 	}
 
 	fields = append(fields, zap.String("req.body", body))
 
 	body = limitBody(config, respDumper.GetResponse())
-	if len(body) > 0 && isExcluded(path, endpoint, regexExcludedPathsResp, config.DumpNoResponseBodyForPaths) {
+	if len(body) > 0 && (config.BodySkipper(c) || isExcluded(c.Request().URL.Path, c.Path(), regexExcludedPathsResp, config.DumpNoResponseBodyForPaths)) {
 		body = "[excluded]"
 	}
 
