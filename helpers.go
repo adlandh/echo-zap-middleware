@@ -2,13 +2,10 @@ package echozapmiddleware
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
-	"regexp"
 	"unicode/utf8"
 
-	contextlogger "github.com/adlandh/context-logger"
 	"github.com/adlandh/response-dumper"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
@@ -103,60 +100,6 @@ func logit(status int, logger *zap.Logger, fields []zapcore.Field) {
 	}
 }
 
-func isExcluded(path string, endpoint string, regexs []*regexp.Regexp, endpoints []string) bool {
-	if len(endpoints) > 0 {
-		for _, endpointExcluded := range endpoints {
-			if endpointExcluded == endpoint {
-				return true
-			}
-		}
-	}
-
-	if len(regexs) > 0 {
-		for _, regexExcludedPath := range regexs {
-			if regexExcludedPath.MatchString(path) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func prepareRegexs(ctxLogger *contextlogger.ContextLogger, config ZapConfig) {
-	regexExcludedPathsResp = make([]*regexp.Regexp, 0, len(config.DumpNoResponseBodyForPaths))
-	regexExcludedPathsReq = make([]*regexp.Regexp, 0, len(config.DumpNoRequestBodyForPaths))
-
-	if !config.IsBodyDump {
-		return
-	}
-
-	if len(config.DumpNoResponseBodyForPaths) > 0 {
-		for _, path := range config.DumpNoResponseBodyForPaths {
-			regexExcludedPath, err := regexp.Compile(path)
-			if err != nil {
-				// Just warn and continue
-				ctxLogger.Ctx(context.Background()).Warn("error to compile regex", zap.String("path", path), zap.Error(err))
-				continue
-			}
-
-			regexExcludedPathsResp = append(regexExcludedPathsResp, regexExcludedPath)
-		}
-	}
-
-	if len(config.DumpNoRequestBodyForPaths) > 0 {
-		for _, path := range config.DumpNoRequestBodyForPaths {
-			regexExcludedPath, err := regexp.Compile(path)
-			if err != nil {
-				ctxLogger.Ctx(context.Background()).Warn("error to compile regex", zap.String("path", path), zap.Error(err))
-				continue
-			}
-
-			regexExcludedPathsReq = append(regexExcludedPathsReq, regexExcludedPath)
-		}
-	}
-}
-
 func addHeaders(config ZapConfig, reqHeaders http.Header, resHeaders http.Header) []zapcore.Field {
 	if !config.AreHeadersDump {
 		return nil
@@ -169,22 +112,23 @@ func addHeaders(config ZapConfig, reqHeaders http.Header, resHeaders http.Header
 }
 
 func addBody(config ZapConfig, c echo.Context, reqBody string, respDumper *response.Dumper) []zapcore.Field {
-	if !config.IsBodyDump || config.BodySkipper == nil {
+	if !config.IsBodyDump {
 		return nil
 	}
+
+	skipReq, skipResp := config.BodySkipper(c)
 
 	var fields []zapcore.Field
 
 	body := limitBody(config, reqBody)
-	if len(body) > 0 &&
-		(config.BodySkipper(c) || isExcluded(c.Request().URL.Path, c.Path(), regexExcludedPathsReq, config.DumpNoRequestBodyForPaths)) {
+	if len(body) > 0 && skipReq {
 		body = "[excluded]"
 	}
 
 	fields = append(fields, zap.String("req.body", body))
 
 	body = limitBody(config, respDumper.GetResponse())
-	if len(body) > 0 && (config.BodySkipper(c) || isExcluded(c.Request().URL.Path, c.Path(), regexExcludedPathsResp, config.DumpNoResponseBodyForPaths)) {
+	if len(body) > 0 && skipResp {
 		body = "[excluded]"
 	}
 

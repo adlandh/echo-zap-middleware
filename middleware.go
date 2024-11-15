@@ -2,7 +2,6 @@
 package echozapmiddleware
 
 import (
-	"regexp"
 	"time"
 
 	contextlogger "github.com/adlandh/context-logger"
@@ -13,6 +12,12 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type BodySkipper func(c echo.Context) (skipReqBody, skipRespBody bool)
+
+func defaultBodySkipper(_ echo.Context) (skipReqBody, skipRespBody bool) {
+	return
+}
+
 type (
 	// ZapConfig defines the config for Zap Logger middleware.
 	ZapConfig struct {
@@ -20,13 +25,7 @@ type (
 		Skipper middleware.Skipper
 
 		// BodySkipper defines a function to exclude body from logging
-		BodySkipper middleware.Skipper
-
-		// paths (regular expressions) or endpoints (ex: `/ping/:id`) to exclude from dumping response bodies
-		DumpNoResponseBodyForPaths []string
-
-		// paths (regular expressions) or endpoints (ex: `/ping/:id`) to exclude from dumping request bodies (regular expressions)
-		DumpNoRequestBodyForPaths []string
+		BodySkipper BodySkipper
 
 		// add req headers & resp headers to tracing tags
 		AreHeadersDump bool
@@ -42,12 +41,11 @@ type (
 	}
 )
 
-var regexExcludedPathsReq, regexExcludedPathsResp []*regexp.Regexp
-
 var (
 	// DefaultZapConfig is the default Zap Logger middleware config.
 	DefaultZapConfig = ZapConfig{
 		Skipper:        middleware.DefaultSkipper,
+		BodySkipper:    defaultBodySkipper,
 		AreHeadersDump: false,
 		IsBodyDump:     false,
 		LimitHTTPBody:  true,
@@ -56,8 +54,6 @@ var (
 )
 
 func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.MiddlewareFunc {
-	prepareRegexs(ctxLogger, config)
-
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if config.Skipper(c) || c.Request() == nil || c.Response() == nil {
@@ -121,7 +117,7 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 	}
 
 	if config[0].BodySkipper == nil {
-		config[0].BodySkipper = middleware.DefaultSkipper
+		config[0].BodySkipper = defaultBodySkipper
 	}
 
 	return makeHandler(ctxLogger, config[0])
