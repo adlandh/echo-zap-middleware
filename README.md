@@ -40,13 +40,15 @@ func main() {
 			// if you would like to save your request or response body as tags, set IsBodyDump to true
 			IsBodyDump: true,
 			// No dump for /pong
-			DumpNoResponseBodyForPaths: []string{"/pong"},
 			// No dump for gzip
-			BodySkipper: func(c echo.Context) bool {
-				if c.Request().Header.Get("Content-Encoding") == "gzip" {
-					return true
+			BodySkipper: func(c echo.Context) (bool, bool) {
+				if c.Request().URL.Path == "/pong" { 
+					return true, true 
 				}
-				return false
+				if c.Request().Header.Get("Content-Encoding") == "gzip" {
+					return true, true
+				}
+				return false, false
 			},
 		}))
 
