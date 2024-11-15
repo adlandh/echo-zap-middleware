@@ -41,6 +41,13 @@ func main() {
 			IsBodyDump: true,
 			// No dump for /pong
 			DumpNoResponseBodyForPaths: []string{"/pong"},
+			// No dump for gzip
+			BodySkipper: func(c echo.Context) bool {
+				if c.Request().Header.Get("Content-Encoding") == "gzip" {
+					return true
+				}
+				return false
+			},
 		}))
 
 	// Add some endpoints

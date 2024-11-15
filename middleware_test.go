@@ -163,6 +163,37 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 		s.Contains(s.sink.String(), "\"resp.body\": \"ok\"")
 		s.Contains(s.sink.String(), "\"req.body\": \"[excluded]\"")
 	})
+
+	s.Run("exclude gzip from req and resp", func() {
+		s.sink.Reset()
+		s.router = echo.New()
+		s.router.Use(middleware.RequestID())
+		s.router.Use(Middleware(s.logger, ZapConfig{
+			DumpNoResponseBodyForPaths: []string{
+				"^\\/ping\\/121",
+			},
+			IsBodyDump: true,
+			BodySkipper: func(c echo.Context) bool {
+				if c.Request().Header.Get("Content-Encoding") == "gzip" {
+					return true
+				}
+				return false
+			},
+		}))
+		s.router.GET("/ping/:id", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
+		r := httptest.NewRequest("GET", "/ping/121?sdsdds=1212", strings.NewReader("test"))
+		r.Header.Set("Content-Encoding", "gzip")
+		w := httptest.NewRecorder()
+		s.router.ServeHTTP(w, r)
+
+		response := w.Result()
+		s.Equal(http.StatusOK, response.StatusCode)
+		s.Contains(s.sink.String(), "\"resp.body\": \"[excluded]\"")
+		s.Contains(s.sink.String(), "\"req.body\": \"[excluded]\"")
+	})
+
 }
 
 func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {

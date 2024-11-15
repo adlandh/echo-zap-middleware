@@ -19,6 +19,9 @@ type (
 		// Skipper defines a function to skip middleware.
 		Skipper middleware.Skipper
 
+		// BodySkipper defines a function to exclude body from logging
+		BodySkipper middleware.Skipper
+
 		// paths (regular expressions) or endpoints (ex: `/ping/:id`) to exclude from dumping response bodies
 		DumpNoResponseBodyForPaths []string
 
@@ -98,7 +101,7 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 			fields = append(fields, addHeaders(config, req.Header, res.Header())...)
 
 			// add body
-			fields = append(fields, addBody(config, req.URL.Path, c.Path(), string(reqBody), respDumper)...)
+			fields = append(fields, addBody(config, c, string(reqBody), respDumper)...)
 
 			logit(res.Status, ctxLogger.Ctx(ctx), fields)
 
@@ -115,6 +118,10 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 
 	if config[0].Skipper == nil {
 		config[0].Skipper = middleware.DefaultSkipper
+	}
+
+	if config[0].BodySkipper == nil {
+		config[0].BodySkipper = middleware.DefaultSkipper
 	}
 
 	return makeHandler(ctxLogger, config[0])
