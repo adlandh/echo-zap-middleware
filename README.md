@@ -217,3 +217,44 @@ The middleware automatically selects the appropriate log level based on the HTTP
 - **INFO** for 3xx (Redirection)
 - **WARN** for 4xx (Client Error)
 - **ERROR** for 5xx (Server Error)
+
+## Benchmarks
+
+The middleware includes benchmark tests to measure its performance under various configurations. These benchmarks can help you understand the performance impact of different middleware options.
+
+### Running Benchmarks
+
+To run all benchmarks:
+
+```shell
+go test -bench=. -benchmem
+```
+
+To run a specific benchmark:
+
+```shell
+go test -bench=BenchmarkMiddlewareWithBodyAndHeaders -benchmem
+```
+
+### Available Benchmarks
+
+The following benchmarks are available:
+
+| Benchmark | Description |
+|-----------|-------------|
+| `BenchmarkMiddlewareDefault` | Tests the middleware with default configuration |
+| `BenchmarkMiddlewareWithBodyAndHeaders` | Tests with body and header logging enabled |
+| `BenchmarkMiddlewareWithLargeBody` | Tests with a large request body (10KB) |
+| `BenchmarkMiddlewareWithBodyLimit` | Tests with body size limiting (100 bytes) |
+| `BenchmarkMiddlewareWithBodySkipper` | Tests with a body skipper function |
+| `BenchmarkMiddlewareWithContextLogger` | Tests with context logger |
+| `BenchmarkMiddlewareWithCustomSkipper` | Tests with a custom skipper function |
+
+### Performance Considerations
+
+When configuring the middleware, consider the following performance implications:
+
+1. Enabling body dumping (`IsBodyDump: true`) can significantly impact performance, especially with large request/response bodies.
+2. Using body size limits (`LimitHTTPBody: true`) can help mitigate performance issues when body dumping is enabled.
+3. Using a body skipper function to exclude large or binary content can improve performance.
+4. Header dumping (`AreHeadersDump: true`) has a smaller performance impact than body dumping but should still be considered.
