@@ -75,7 +75,7 @@ func createLogFields(c echo.Context, start time.Time) []zapcore.Field {
 	req := c.Request()
 	res := c.Response()
 
-	return []zapcore.Field{
+	fields := []zapcore.Field{
 		zap.Int("status", res.Status),
 		zap.String("latency", time.Since(start).String()),
 		zap.String("request_id", getRequestID(c)),
@@ -84,6 +84,14 @@ func createLogFields(c echo.Context, start time.Time) []zapcore.Field {
 		zap.String("host", req.Host),
 		zap.String("remote_ip", c.RealIP()),
 	}
+
+	ctxErr := req.Context().Err()
+
+	if ctxErr != nil {
+		fields = append(fields, zap.NamedError("context error", ctxErr))
+	}
+
+	return fields
 }
 
 // makeHandler creates the middleware handler function.
@@ -127,8 +135,8 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 			// Add request/response body if configured
 			fields = append(fields, addBody(config, c, string(reqBody), respDumper)...)
 
-			// Log with appropriate level based on status code
-			logit(c.Response().Status, ctxLogger.Ctx(ctx), fields)
+			// Log with appropriate level based on status code and commit status
+			logit(c.Response().Committed, c.Response().Status, ctxLogger.Ctx(ctx), fields)
 
 			return nil
 		}

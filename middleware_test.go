@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	contextlogger "github.com/adlandh/context-logger"
 	"github.com/labstack/echo/v4"
@@ -175,6 +176,50 @@ func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 	s.NotContains(s.sink.String(), "headers")
 	s.NotContains(s.sink.String(), "request_id_from_context")
 }
+
+func (s *MiddlewareTestSuite) TestWithSilentHandler() {
+	s.router.Use(Middleware(s.logger))
+	s.router.GET("/ping", func(c echo.Context) error {
+		// return nothing as response
+		return nil
+	})
+	r := httptest.NewRequest("GET", "/ping", nil)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	response := w.Result()
+	s.Equal(http.StatusOK, response.StatusCode)
+	s.NotContains(s.sink.String(), "body")
+	s.NotContains(s.sink.String(), "headers")
+	s.NotContains(s.sink.String(), "request_id_from_context")
+	s.Contains(s.sink.String(), "WARN")
+	s.Contains(s.sink.String(), "Response not committed")
+}
+
+func (s *MiddlewareTestSuite) TestWithClientCanceledContext() {
+	s.router.Use(Middleware(s.logger))
+	s.router.GET("/ping", func(c echo.Context) error {
+		// return nothing as response
+		time.Sleep(10 * time.Millisecond)
+		return nil
+	})
+	r := httptest.NewRequest("GET", "/ping", nil)
+	ctx, cancel := context.WithCancel(r.Context())
+	cancel() // cancel context immediately
+	r = r.WithContext(ctx)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	response := w.Result()
+	s.Equal(http.StatusOK, response.StatusCode)
+	s.NotContains(s.sink.String(), "body")
+	s.NotContains(s.sink.String(), "headers")
+	s.NotContains(s.sink.String(), "request_id_from_context")
+	s.Contains(s.sink.String(), "WARN")
+	s.Contains(s.sink.String(), "Response not committed")
+	s.Contains(s.sink.String(), "context canceled")
+}
+
 func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
 	s.router.Use(Middleware(s.logger, ZapConfig{
 		AreHeadersDump: true,

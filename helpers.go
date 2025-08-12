@@ -105,8 +105,10 @@ func getRequestID(ctx echo.Context) string {
 }
 
 // logit logs the request with appropriate level based on HTTP status code.
-func logit(status int, logger *zap.Logger, fields []zapcore.Field) {
+func logit(commited bool, status int, logger *zap.Logger, fields []zapcore.Field) {
 	switch {
+	case !commited:
+		logger.Warn("Response not committed", fields...)
 	case status >= 500:
 		logger.Error("Server error", fields...)
 	case status >= 400:
