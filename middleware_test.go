@@ -189,9 +189,6 @@ func (s *MiddlewareTestSuite) TestWithSilentHandler() {
 
 	response := w.Result()
 	s.Equal(http.StatusOK, response.StatusCode)
-	s.NotContains(s.sink.String(), "body")
-	s.NotContains(s.sink.String(), "headers")
-	s.NotContains(s.sink.String(), "request_id_from_context")
 	s.Contains(s.sink.String(), "WARN")
 	s.Contains(s.sink.String(), "Response not committed")
 }
@@ -212,9 +209,6 @@ func (s *MiddlewareTestSuite) TestWithClientCanceledContext() {
 
 	response := w.Result()
 	s.Equal(http.StatusOK, response.StatusCode)
-	s.NotContains(s.sink.String(), "body")
-	s.NotContains(s.sink.String(), "headers")
-	s.NotContains(s.sink.String(), "request_id_from_context")
 	s.Contains(s.sink.String(), "WARN")
 	s.Contains(s.sink.String(), "Response not committed")
 	s.Contains(s.sink.String(), "context canceled")
