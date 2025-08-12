@@ -195,8 +195,8 @@ func (s *MiddlewareTestSuite) TestWithSilentHandler() {
 
 func (s *MiddlewareTestSuite) TestWithClientCanceledContext() {
 	s.router.Use(Middleware(s.logger))
-	s.router.GET("/ping", func(_ echo.Context) error {
-		// return nothing as response
+	s.router.GET("/ping", func(c echo.Context) error {
+		// add delay to make sure the request is canceled
 		time.Sleep(10 * time.Millisecond)
 		return nil
 	})
