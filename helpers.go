@@ -144,7 +144,7 @@ func addBody(config ZapConfig, c echo.Context, reqBody string, respDumper *respo
 
 	// Process request body
 	reqBodyContent := limitBody(config, reqBody)
-	if len(reqBodyContent) > 0 && skipReq {
+	if reqBodyContent != "" && skipReq {
 		reqBodyContent = "[excluded]"
 	}
 
@@ -152,7 +152,7 @@ func addBody(config ZapConfig, c echo.Context, reqBody string, respDumper *respo
 
 	// Process response body
 	respBodyContent := limitBody(config, respDumper.GetResponse())
-	if len(respBodyContent) > 0 && skipResp {
+	if respBodyContent != "" && skipResp {
 		respBodyContent = "[excluded]"
 	}
 

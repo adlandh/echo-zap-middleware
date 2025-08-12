@@ -166,7 +166,7 @@ func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 	s.router.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
-	r := httptest.NewRequest("GET", "/ping", nil)
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, r)
 
@@ -179,11 +179,11 @@ func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 
 func (s *MiddlewareTestSuite) TestWithSilentHandler() {
 	s.router.Use(Middleware(s.logger))
-	s.router.GET("/ping", func(c echo.Context) error {
+	s.router.GET("/ping", func(_ echo.Context) error {
 		// return nothing as response
 		return nil
 	})
-	r := httptest.NewRequest("GET", "/ping", nil)
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, r)
 
@@ -198,12 +198,12 @@ func (s *MiddlewareTestSuite) TestWithSilentHandler() {
 
 func (s *MiddlewareTestSuite) TestWithClientCanceledContext() {
 	s.router.Use(Middleware(s.logger))
-	s.router.GET("/ping", func(c echo.Context) error {
+	s.router.GET("/ping", func(_ echo.Context) error {
 		// return nothing as response
 		time.Sleep(10 * time.Millisecond)
 		return nil
 	})
-	r := httptest.NewRequest("GET", "/ping", nil)
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
 	ctx, cancel := context.WithCancel(r.Context())
 	cancel() // cancel context immediately
 	r = r.WithContext(ctx)
@@ -228,7 +228,7 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
 	s.router.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
-	r := httptest.NewRequest("GET", "/ping", nil)
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, r)
 
@@ -250,7 +250,7 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 	s.router.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
-	r := httptest.NewRequest("GET", "/ping", nil)
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, r)
 
