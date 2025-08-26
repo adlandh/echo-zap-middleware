@@ -8,7 +8,7 @@ require (
 	github.com/adlandh/context-logger v1.3.4
 	github.com/adlandh/response-dumper v1.1.1
 	github.com/labstack/echo/v4 v4.13.4
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	go.uber.org/zap v1.27.0
 )
 
