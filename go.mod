@@ -1,15 +1,13 @@
 module github.com/adlandh/echo-zap-middleware
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25
 
 require (
-	github.com/adlandh/context-logger v1.3.4
+	github.com/adlandh/context-logger v1.3.5
 	github.com/adlandh/response-dumper v1.1.1
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 )
 
 require (
@@ -25,6 +23,6 @@ require (
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
-	golang.org/x/time v0.12.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
