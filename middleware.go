@@ -54,7 +54,7 @@ type ZapConfig struct {
 
 	// LimitSize specifies the maximum size (in bytes) for logged HTTP bodies.
 	// Bodies larger than this will be truncated with "..." appended.
-	// Only used when LimitHTTPBody is true.
+	// Only used when LimitHTTPBody is true; <= 0 disables limiting.
 	LimitSize int
 }
 
@@ -75,7 +75,8 @@ func createLogFields(c echo.Context, start time.Time) []zapcore.Field {
 	req := c.Request()
 	res := c.Response()
 
-	fields := []zapcore.Field{
+	fields := make([]zapcore.Field, 0, 8)
+	fields = append(fields,
 		zap.Int("status", res.Status),
 		zap.String("latency", time.Since(start).String()),
 		zap.String("request_id", getRequestID(c)),
@@ -83,12 +84,12 @@ func createLogFields(c echo.Context, start time.Time) []zapcore.Field {
 		zap.String("uri", req.RequestURI),
 		zap.String("host", req.Host),
 		zap.String("remote_ip", c.RealIP()),
-	}
+	)
 
 	ctxErr := req.Context().Err()
 
 	if ctxErr != nil {
-		fields = append(fields, zap.NamedError("context error", ctxErr))
+		fields = append(fields, zap.NamedError("context_error", ctxErr))
 	}
 
 	return fields
@@ -156,6 +157,10 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 	// Use default config if none provided
 	if len(config) == 0 {
 		config = []ZapConfig{DefaultZapConfig}
+	}
+
+	if ctxLogger == nil {
+		ctxLogger = contextlogger.WithContext(zap.NewNop())
 	}
 
 	// Ensure Skipper is set
