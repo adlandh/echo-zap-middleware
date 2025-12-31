@@ -111,6 +111,10 @@ func TestLimitString(t *testing.T) {
 		require.Equal(t, "hello", limitString("hello", 10))
 	})
 
+	t.Run("size zero returns empty", func(t *testing.T) {
+		require.Equal(t, "", limitString("hello", 0))
+	})
+
 	t.Run("truncates invalid utf8 bytes", func(t *testing.T) {
 		euro := string([]byte{0xE2, 0x82, 0xAC})
 		input := "ab" + euro + "cd"
@@ -121,7 +125,7 @@ func TestLimitString(t *testing.T) {
 func TestLimitStringWithDots(t *testing.T) {
 	t.Parallel()
 
-	t.Run("small size uses plain truncation", func(t *testing.T) {
+	t.Run("size ten keeps no dots", func(t *testing.T) {
 		require.Equal(t, "0123456789", limitStringWithDots("0123456789ABC", 10))
 	})
 
@@ -161,6 +165,9 @@ func TestGetRequestID(t *testing.T) {
 
 	req.Header.Del(echo.HeaderXRequestID)
 	require.Equal(t, "from-response", getRequestID(ctx))
+
+	ctx.Response().Header().Del(echo.HeaderXRequestID)
+	require.Equal(t, "", getRequestID(ctx))
 }
 
 func TestLogit(t *testing.T) {
@@ -253,5 +260,18 @@ func TestAddBody(t *testing.T) {
 	fields = addBody(config, ctx, "0123456789ABCDEF", respDumper)
 	require.Len(t, fields, 2)
 	require.Equal(t, "012345678...", fields[0].String)
+	require.Equal(t, "response", fields[1].String)
+
+	config = ZapConfig{
+		IsBodyDump:    true,
+		LimitHTTPBody: true,
+		LimitSize:     0,
+		BodySkipper: func(echo.Context) (bool, bool) {
+			return false, false
+		},
+	}
+	fields = addBody(config, ctx, "0123456789ABCDEF", respDumper)
+	require.Len(t, fields, 2)
+	require.Equal(t, "0123456789ABCDEF", fields[0].String)
 	require.Equal(t, "response", fields[1].String)
 }

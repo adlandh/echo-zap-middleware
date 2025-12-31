@@ -21,6 +21,18 @@ func (r readCloser) Close() error {
 	return r.closeFunc()
 }
 
+func restoreRequestBody(original io.ReadCloser, captured []byte, useOriginal bool) io.ReadCloser {
+	if useOriginal {
+		replay := bytes.NewBuffer(captured)
+		return readCloser{
+			Reader:    io.MultiReader(replay, original),
+			closeFunc: original.Close,
+		}
+	}
+
+	return io.NopCloser(bytes.NewBuffer(captured))
+}
+
 // prepareReqAndResp sets up request body capture and response dumping if enabled in config.
 // Returns the response dumper and captured request body.
 func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []byte) {
@@ -44,11 +56,7 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 			if err != nil {
 				req.Body = originalBody
 			} else {
-				replay := bytes.NewBuffer(reqBody)
-				req.Body = readCloser{
-					Reader:    io.MultiReader(replay, originalBody),
-					closeFunc: originalBody.Close,
-				}
+				req.Body = restoreRequestBody(originalBody, reqBody, true)
 			}
 		} else {
 			reqBody, err = io.ReadAll(req.Body)
@@ -57,7 +65,7 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 			} else {
 				_ = req.Body.Close()
 				// Reset original request body so it can be read again by handlers
-				req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+				req.Body = restoreRequestBody(originalBody, reqBody, false)
 			}
 		}
 	}
@@ -71,16 +79,21 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 
 // limitString truncates a string to the specified size while ensuring UTF-8 validity.
 func limitString(str string, size int) string {
+	if size <= 0 {
+		return ""
+	}
+
 	// Quick check if truncation is needed
 	if len(str) <= size {
 		return str
 	}
 
+	if utf8.ValidString(str[:size]) {
+		return str[:size]
+	}
+
 	// Convert to bytes for UTF-8 handling
 	strBytes := []byte(str)
-	if len(strBytes) <= size {
-		return str
-	}
 
 	// Truncate and ensure UTF-8 validity
 	validBytes := strBytes[:size]
