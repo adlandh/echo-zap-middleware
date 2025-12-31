@@ -12,6 +12,15 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type readCloser struct {
+	io.Reader
+	closeFunc func() error
+}
+
+func (r readCloser) Close() error {
+	return r.closeFunc()
+}
+
 // prepareReqAndResp sets up request body capture and response dumping if enabled in config.
 // Returns the response dumper and captured request body.
 func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []byte) {
@@ -26,13 +35,30 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 
 	// Capture request body if present
 	if req.Body != nil {
+		originalBody := req.Body
 		var err error
 
-		reqBody, err = io.ReadAll(req.Body)
-		if err == nil {
-			_ = req.Body.Close()
-			// Reset original request body so it can be read again by handlers
-			req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+		if config.LimitHTTPBody && config.LimitSize > 0 {
+			limitedReader := io.LimitReader(req.Body, int64(config.LimitSize)+1)
+			reqBody, err = io.ReadAll(limitedReader)
+			if err != nil {
+				req.Body = originalBody
+			} else {
+				replay := bytes.NewBuffer(reqBody)
+				req.Body = readCloser{
+					Reader:    io.MultiReader(replay, originalBody),
+					closeFunc: originalBody.Close,
+				}
+			}
+		} else {
+			reqBody, err = io.ReadAll(req.Body)
+			if err != nil {
+				req.Body = originalBody
+			} else {
+				_ = req.Body.Close()
+				// Reset original request body so it can be read again by handlers
+				req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+			}
 		}
 	}
 
@@ -89,6 +115,10 @@ func limitBody(config ZapConfig, str string) string {
 		return str
 	}
 
+	if config.LimitSize <= 0 {
+		return str
+	}
+
 	return limitStringWithDots(str, config.LimitSize)
 }
 
@@ -136,6 +166,10 @@ func addHeaders(config ZapConfig, reqHeaders http.Header, resHeaders http.Header
 // Bodies can be excluded based on the BodySkipper function in the config.
 func addBody(config ZapConfig, c echo.Context, reqBody string, respDumper *response.Dumper) []zapcore.Field {
 	if !config.IsBodyDump {
+		return nil
+	}
+
+	if respDumper == nil {
 		return nil
 	}
 

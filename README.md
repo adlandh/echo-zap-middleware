@@ -108,7 +108,7 @@ app.Use(echo_zap_middleware.Middleware(
 | `AreHeadersDump` | `bool` | `false` | Controls whether request and response headers are included in logs |
 | `IsBodyDump` | `bool` | `false` | Controls whether request and response bodies are included in logs |
 | `LimitHTTPBody` | `bool` | `true` | Controls whether to limit the size of logged HTTP bodies |
-| `LimitSize` | `int` | `500` | Maximum size (in bytes) for logged HTTP bodies |
+| `LimitSize` | `int` | `500` | Maximum size (in bytes) for logged HTTP bodies; `<= 0` disables limiting |
 
 ## Context-Aware Logging
 
