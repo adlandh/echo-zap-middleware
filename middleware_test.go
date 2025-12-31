@@ -47,6 +47,8 @@ type MiddlewareTestSuite struct {
 	router    *echo.Echo
 	logger    *zap.Logger
 	ctxLogger *contextlogger.ContextLogger
+	expectLog bool
+	expectMethod string
 }
 
 func (s *MiddlewareTestSuite) SetupSuite() {
@@ -68,10 +70,15 @@ func (s *MiddlewareTestSuite) SetupTest() {
 	s.sink.Reset()
 	s.router = echo.New()
 	s.router.Use(middleware.RequestID())
+	s.expectLog = true
+	s.expectMethod = "GET"
 }
 
 func (s *MiddlewareTestSuite) TearDownTest() {
-	s.Contains(s.sink.String(), "GET")
+	if !s.expectLog {
+		return
+	}
+	s.Contains(s.sink.String(), s.expectMethod)
 	s.Contains(s.sink.String(), "/ping")
 	s.Contains(s.sink.String(), "request_id")
 }
@@ -253,6 +260,77 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 	s.NotContains(s.sink.String(), "body")
 	s.NotContains(s.sink.String(), "headers")
 	s.Contains(s.sink.String(), "request_id_from_context")
+}
+
+func (s *MiddlewareTestSuite) TestSkipperSkipsLogging() {
+	s.router.Use(Middleware(s.logger, ZapConfig{
+		Skipper: func(echo.Context) bool {
+			return true
+		},
+	}))
+	s.router.GET("/ping", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	response := w.Result()
+	s.Equal(http.StatusOK, response.StatusCode)
+	s.Equal("ok", w.Body.String())
+	s.Empty(s.sink.String())
+	s.expectLog = false
+}
+
+func (s *MiddlewareTestSuite) TestBodySkipperNilDefaults() {
+	s.router.Use(Middleware(s.logger, ZapConfig{
+		IsBodyDump: true,
+	}))
+	s.router.POST("/ping", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+	r := httptest.NewRequest("POST", "/ping", strings.NewReader("test"))
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	response := w.Result()
+	s.Equal(http.StatusOK, response.StatusCode)
+	s.Contains(s.sink.String(), "\"req.body\": \"test\"")
+	s.Contains(s.sink.String(), "\"resp.body\": \"ok\"")
+	s.expectMethod = "POST"
+}
+
+func (s *MiddlewareTestSuite) TestBodyLimitApplied() {
+	s.router.Use(Middleware(s.logger, ZapConfig{
+		IsBodyDump:    true,
+		LimitHTTPBody: true,
+		LimitSize:     12,
+	}))
+	s.router.POST("/ping", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+	r := httptest.NewRequest("POST", "/ping", strings.NewReader("0123456789ABCDEF"))
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	response := w.Result()
+	s.Equal(http.StatusOK, response.StatusCode)
+	s.Contains(s.sink.String(), "\"req.body\": \"012345678...\"")
+	s.expectMethod = "POST"
+}
+
+func (s *MiddlewareTestSuite) TestRequestIDFromResponseHeader() {
+	s.router.Use(Middleware(s.logger))
+	s.router.GET("/ping", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	response := w.Result()
+	s.Equal(http.StatusOK, response.StatusCode)
+	s.Regexp(regexp.MustCompile(`"request_id":\s*".+"`), s.sink.String())
 }
 
 func TestMiddleware(t *testing.T) {
