@@ -87,7 +87,6 @@ func createLogFields(c echo.Context, start time.Time) []zapcore.Field {
 	)
 
 	ctxErr := req.Context().Err()
-
 	if ctxErr != nil {
 		fields = append(fields, zap.NamedError("context_error", ctxErr))
 	}

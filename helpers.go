@@ -24,6 +24,7 @@ func (r readCloser) Close() error {
 func restoreRequestBody(original io.ReadCloser, captured []byte, useOriginal bool) io.ReadCloser {
 	if useOriginal {
 		replay := bytes.NewBuffer(captured)
+
 		return readCloser{
 			Reader:    io.MultiReader(replay, original),
 			closeFunc: original.Close,
@@ -48,10 +49,12 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 	// Capture request body if present
 	if req.Body != nil {
 		originalBody := req.Body
+
 		var err error
 
 		if config.LimitHTTPBody && config.LimitSize > 0 {
 			limitedReader := io.LimitReader(req.Body, int64(config.LimitSize)+1)
+
 			reqBody, err = io.ReadAll(limitedReader)
 			if err != nil {
 				req.Body = originalBody
