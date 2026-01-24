@@ -6,8 +6,8 @@ import (
 
 	contextlogger "github.com/adlandh/context-logger"
 	"github.com/adlandh/response-dumper"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -18,11 +18,11 @@ import (
 //   - skipRespBody: When true, the response body will be marked as "[excluded]" in logs
 //
 // This is useful for excluding sensitive data or large binary content from logs.
-type BodySkipper func(c echo.Context) (skipReqBody, skipRespBody bool)
+type BodySkipper func(c *echo.Context) (skipReqBody, skipRespBody bool)
 
 // defaultBodySkipper is the default implementation of BodySkipper that doesn't exclude any bodies.
 // It always returns false for both skipReqBody and skipRespBody, meaning all bodies will be logged.
-func defaultBodySkipper(_ echo.Context) (skipReqBody, skipRespBody bool) {
+func defaultBodySkipper(_ *echo.Context) (skipReqBody, skipRespBody bool) {
 	return false, false
 }
 
@@ -71,13 +71,13 @@ var (
 )
 
 // createLogFields creates the standard log fields for a request/response.
-func createLogFields(c echo.Context, start time.Time) []zapcore.Field {
+func createLogFields(c *echo.Context, start time.Time) []zapcore.Field {
 	req := c.Request()
-	res := c.Response()
+	status, _ := responseStatus(c)
 
 	fields := make([]zapcore.Field, 0, 8)
 	fields = append(fields,
-		zap.Int("status", res.Status),
+		zap.Int("status", status),
 		zap.String("latency", time.Since(start).String()),
 		zap.String("request_id", getRequestID(c)),
 		zap.String("method", req.Method),
@@ -97,7 +97,7 @@ func createLogFields(c echo.Context, start time.Time) []zapcore.Field {
 // makeHandler creates the middleware handler function.
 func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			// Skip logging if configured to do so or if request/response is nil
 			if config.Skipper(c) || c.Request() == nil || c.Response() == nil {
 				return next(c)
@@ -123,7 +123,7 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 			// Process the request
 			err := next(c)
 			if err != nil {
-				c.Error(err)
+				c.Echo().HTTPErrorHandler(c, err)
 			}
 
 			// Create log fields
@@ -136,7 +136,8 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 			fields = append(fields, addBody(config, c, string(reqBody), respDumper)...)
 
 			// Log with appropriate level based on status code and commit status
-			logit(c.Response().Committed, c.Response().Status, ctxLogger.Ctx(ctx), fields)
+			status, committed := responseStatus(c)
+			logit(committed, status, ctxLogger.Ctx(ctx), fields)
 
 			return nil
 		}

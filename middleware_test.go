@@ -12,8 +12,8 @@ import (
 	"time"
 
 	contextlogger "github.com/adlandh/context-logger"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 )
@@ -24,7 +24,7 @@ func (c contextKey) String() string {
 	return string(c)
 }
 
-func (c contextKey) Saver(e echo.Context, id string) {
+func (c contextKey) Saver(e *echo.Context, id string) {
 	ctx := context.WithValue(e.Request().Context(), c, id)
 	e.SetRequest(e.Request().WithContext(ctx))
 }
@@ -43,11 +43,11 @@ func (*MemorySink) Sync() error  { return nil }
 
 type MiddlewareTestSuite struct {
 	suite.Suite
-	sink      *MemorySink
-	router    *echo.Echo
-	logger    *zap.Logger
-	ctxLogger *contextlogger.ContextLogger
-	expectLog bool
+	sink         *MemorySink
+	router       *echo.Echo
+	logger       *zap.Logger
+	ctxLogger    *contextlogger.ContextLogger
+	expectLog    bool
 	expectMethod string
 }
 
@@ -91,7 +91,7 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
 			IsBodyDump: true,
-			BodySkipper: func(c echo.Context) (skipReq, skipResp bool) {
+			BodySkipper: func(c *echo.Context) (skipReq, skipResp bool) {
 				if rx.MatchString(c.Request().URL.Path) {
 					return false, true
 				}
@@ -99,7 +99,7 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 				return
 			},
 		}))
-		s.router.GET("/ping/:id", func(c echo.Context) error {
+		s.router.GET("/ping/:id", func(c *echo.Context) error {
 			return c.String(http.StatusOK, "ok")
 		})
 		r := httptest.NewRequest("GET", "/ping/121?sdsdds=1212", strings.NewReader("test"))
@@ -118,7 +118,7 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
 			IsBodyDump: true,
-			BodySkipper: func(c echo.Context) (skipReq, skipResp bool) {
+			BodySkipper: func(c *echo.Context) (skipReq, skipResp bool) {
 				if c.Path() == "/ping/:id" {
 					return true, false
 				}
@@ -126,7 +126,7 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 				return
 			},
 		}))
-		s.router.GET("/ping/:id", func(c echo.Context) error {
+		s.router.GET("/ping/:id", func(c *echo.Context) error {
 			return c.String(http.StatusOK, "ok")
 		})
 		r := httptest.NewRequest("GET", "/ping/123", strings.NewReader("test"))
@@ -145,14 +145,14 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 		s.router.Use(middleware.RequestID())
 		s.router.Use(Middleware(s.logger, ZapConfig{
 			IsBodyDump: true,
-			BodySkipper: func(c echo.Context) (bool, bool) {
+			BodySkipper: func(c *echo.Context) (bool, bool) {
 				if c.Request().Header.Get("Content-Encoding") == "gzip" {
 					return true, true
 				}
 				return false, false
 			},
 		}))
-		s.router.GET("/ping/:id", func(c echo.Context) error {
+		s.router.GET("/ping/:id", func(c *echo.Context) error {
 			return c.String(http.StatusOK, "ok")
 		})
 		r := httptest.NewRequest("GET", "/ping/121?sdsdds=1212", strings.NewReader("test"))
@@ -170,7 +170,7 @@ func (s *MiddlewareTestSuite) TestWithExcludedPath() {
 
 func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 	s.router.Use(Middleware(s.logger))
-	s.router.GET("/ping", func(c echo.Context) error {
+	s.router.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", http.NoBody)
@@ -186,7 +186,7 @@ func (s *MiddlewareTestSuite) TestWithNoBodyNoHeaders() {
 
 func (s *MiddlewareTestSuite) TestWithSilentHandler() {
 	s.router.Use(Middleware(s.logger))
-	s.router.GET("/ping", func(_ echo.Context) error {
+	s.router.GET("/ping", func(_ *echo.Context) error {
 		// return nothing as response
 		return nil
 	})
@@ -202,7 +202,7 @@ func (s *MiddlewareTestSuite) TestWithSilentHandler() {
 
 func (s *MiddlewareTestSuite) TestWithClientCanceledContext() {
 	s.router.Use(Middleware(s.logger))
-	s.router.GET("/ping", func(_ echo.Context) error {
+	s.router.GET("/ping", func(_ *echo.Context) error {
 		// add delay to make sure the request is canceled
 		time.Sleep(10 * time.Millisecond)
 		return nil
@@ -226,7 +226,7 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
 		AreHeadersDump: true,
 		IsBodyDump:     true,
 	}))
-	s.router.GET("/ping", func(c echo.Context) error {
+	s.router.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", http.NoBody)
@@ -248,7 +248,7 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 		RequestIDHandler: requestID.Saver,
 	}))
 	s.router.Use(MiddlewareWithContextLogger(s.ctxLogger))
-	s.router.GET("/ping", func(c echo.Context) error {
+	s.router.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", http.NoBody)
@@ -264,11 +264,11 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 
 func (s *MiddlewareTestSuite) TestSkipperSkipsLogging() {
 	s.router.Use(Middleware(s.logger, ZapConfig{
-		Skipper: func(echo.Context) bool {
+		Skipper: func(*echo.Context) bool {
 			return true
 		},
 	}))
-	s.router.GET("/ping", func(c echo.Context) error {
+	s.router.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", http.NoBody)
@@ -286,7 +286,7 @@ func (s *MiddlewareTestSuite) TestBodySkipperNilDefaults() {
 	s.router.Use(Middleware(s.logger, ZapConfig{
 		IsBodyDump: true,
 	}))
-	s.router.POST("/ping", func(c echo.Context) error {
+	s.router.POST("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("POST", "/ping", strings.NewReader("test"))
@@ -306,7 +306,7 @@ func (s *MiddlewareTestSuite) TestBodyLimitApplied() {
 		LimitHTTPBody: true,
 		LimitSize:     12,
 	}))
-	s.router.POST("/ping", func(c echo.Context) error {
+	s.router.POST("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("POST", "/ping", strings.NewReader("0123456789ABCDEF"))
@@ -321,7 +321,7 @@ func (s *MiddlewareTestSuite) TestBodyLimitApplied() {
 
 func (s *MiddlewareTestSuite) TestRequestIDFromResponseHeader() {
 	s.router.Use(Middleware(s.logger))
-	s.router.GET("/ping", func(c echo.Context) error {
+	s.router.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 	r := httptest.NewRequest("GET", "/ping", http.NoBody)

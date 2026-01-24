@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/adlandh/response-dumper"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -27,7 +27,9 @@ func TestPrepareReqAndResp_NoBodyDump(t *testing.T) {
 
 	require.Nil(t, respDumper)
 	require.Empty(t, reqBody)
-	_, isDumper := ctx.Response().Writer.(*response.Dumper)
+	resp, err := echo.UnwrapResponse(ctx.Response())
+	require.NoError(t, err)
+	_, isDumper := resp.ResponseWriter.(*response.Dumper)
 	require.False(t, isDumper)
 
 	readBody, err := io.ReadAll(ctx.Request().Body)
@@ -47,7 +49,9 @@ func TestPrepareReqAndResp_WithBodyDump(t *testing.T) {
 
 	require.NotNil(t, respDumper)
 	require.Equal(t, "hello", string(reqBody))
-	require.Same(t, respDumper, ctx.Response().Writer)
+	resp, err := echo.UnwrapResponse(ctx.Response())
+	require.NoError(t, err)
+	require.Same(t, respDumper, resp.ResponseWriter)
 
 	readBody, err := io.ReadAll(ctx.Request().Body)
 	require.NoError(t, err)
@@ -240,7 +244,7 @@ func TestAddBody(t *testing.T) {
 	config := ZapConfig{
 		IsBodyDump:    true,
 		LimitHTTPBody: false,
-		BodySkipper: func(echo.Context) (bool, bool) {
+		BodySkipper: func(*echo.Context) (bool, bool) {
 			return true, true
 		},
 	}
@@ -253,7 +257,7 @@ func TestAddBody(t *testing.T) {
 		IsBodyDump:    true,
 		LimitHTTPBody: true,
 		LimitSize:     12,
-		BodySkipper: func(echo.Context) (bool, bool) {
+		BodySkipper: func(*echo.Context) (bool, bool) {
 			return false, false
 		},
 	}
@@ -266,7 +270,7 @@ func TestAddBody(t *testing.T) {
 		IsBodyDump:    true,
 		LimitHTTPBody: true,
 		LimitSize:     0,
-		BodySkipper: func(echo.Context) (bool, bool) {
+		BodySkipper: func(*echo.Context) (bool, bool) {
 			return false, false
 		},
 	}
