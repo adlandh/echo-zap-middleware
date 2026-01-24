@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	contextlogger "github.com/adlandh/context-logger"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"go.uber.org/zap"
 )
 
@@ -20,10 +20,10 @@ func setupBenchmarkRouter(b *testing.B, logger *zap.Logger, config ...ZapConfig)
 	router := echo.New()
 	router.Use(middleware.RequestID())
 	router.Use(Middleware(logger, config...))
-	router.GET("/ping", func(c echo.Context) error {
+	router.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
-	router.POST("/echo", func(c echo.Context) error {
+	router.POST("/echo", func(c *echo.Context) error {
 		body := new(bytes.Buffer)
 		_, err := body.ReadFrom(c.Request().Body)
 		if err != nil {
@@ -72,7 +72,7 @@ func (*discardSink) Close() error                      { return nil }
 func BenchmarkMiddlewareDefault(b *testing.B) {
 	logger := setupBenchmarkLogger(b)
 	router := setupBenchmarkRouter(b, logger)
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
@@ -89,7 +89,7 @@ func BenchmarkMiddlewareWithBodyAndHeaders(b *testing.B) {
 		AreHeadersDump: true,
 		IsBodyDump:     true,
 	})
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
@@ -144,7 +144,7 @@ func BenchmarkMiddlewareWithBodySkipper(b *testing.B) {
 	logger := setupBenchmarkLogger(b)
 	router := setupBenchmarkRouter(b, logger, ZapConfig{
 		IsBodyDump: true,
-		BodySkipper: func(c echo.Context) (skipReq, skipResp bool) {
+		BodySkipper: func(*echo.Context) (skipReq, skipResp bool) {
 			return true, true // Always skip both request and response bodies
 		},
 	})
@@ -167,11 +167,11 @@ func BenchmarkMiddlewareWithContextLogger(b *testing.B) {
 	router := echo.New()
 	router.Use(middleware.RequestID())
 	router.Use(MiddlewareWithContextLogger(ctxLogger))
-	router.GET("/ping", func(c echo.Context) error {
+	router.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
@@ -185,13 +185,13 @@ func BenchmarkMiddlewareWithContextLogger(b *testing.B) {
 func BenchmarkMiddlewareWithCustomSkipper(b *testing.B) {
 	logger := setupBenchmarkLogger(b)
 	router := setupBenchmarkRouter(b, logger, ZapConfig{
-		Skipper: func(c echo.Context) bool {
+		Skipper: func(c *echo.Context) bool {
 			// Skip logging for GET requests to /ping
 			return c.Request().Method == http.MethodGet && c.Path() == "/ping"
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()

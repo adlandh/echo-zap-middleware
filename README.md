@@ -50,7 +50,7 @@ func main() {
 	app.Use(echo_zap_middleware.Middleware(logger))
 
 	// Add some endpoints
-	app.GET("/ping", func(c echo.Context) error {
+	app.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "Hello, World!")
 	})
 
@@ -78,12 +78,12 @@ app.Use(echo_zap_middleware.Middleware(
 		LimitSize: 500, // Maximum size in bytes
 
 		// Skip logging for specific requests
-		Skipper: func(c echo.Context) bool {
+		Skipper: func(c *echo.Context) bool {
 			return c.Path() == "/health" // Don't log health check requests
 		},
 
 		// Skip logging specific parts of requests/responses
-		BodySkipper: func(c echo.Context) (skipReqBody, skipRespBody bool) {
+		BodySkipper: func(c *echo.Context) (skipReqBody, skipRespBody bool) {
 			// Skip request bodies for /upload endpoint
 			if c.Path() == "/upload" {
 				return true, false
@@ -122,8 +122,8 @@ import (
 
 	contextlogger "github.com/adlandh/context-logger"
 	echo_zap_middleware "github.com/adlandh/echo-zap-middleware/v2"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"go.uber.org/zap"
 )
 
@@ -141,7 +141,7 @@ func main() {
 	// Add context-aware logger middleware
 	app.Use(echo_zap_middleware.MiddlewareWithContextLogger(ctxLogger))
 
-	app.GET("/ping", func(c echo.Context) error {
+	app.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "Hello, World!")
 	})
 
@@ -160,7 +160,7 @@ import (
 	"net/http"
 
 	echo_zap_middleware "github.com/adlandh/echo-zap-middleware/v2"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"go.uber.org/zap"
 )
 
@@ -184,7 +184,7 @@ func main() {
 			IsBodyDump: true,
 			// No dump for /pong
 			// No dump for gzip
-			BodySkipper: func(c echo.Context) (bool, bool) {
+			BodySkipper: func(c *echo.Context) (bool, bool) {
 				if c.Request().URL.Path == "/pong" { 
 					return true, true 
 				}
@@ -196,11 +196,11 @@ func main() {
 		}))
 
 	// Add some endpoints
-	app.GET("/ping", func(c echo.Context) error {
+	app.GET("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "Hello, World, from Ping!")
 	})
 
-	app.GET("/pong", func(c echo.Context) error {
+	app.GET("/pong", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "Hello, World, from Pong!")
 	})
 
