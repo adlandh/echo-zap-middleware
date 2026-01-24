@@ -72,7 +72,7 @@ func (*discardSink) Close() error                      { return nil }
 func BenchmarkMiddlewareDefault(b *testing.B) {
 	logger := setupBenchmarkLogger(b)
 	router := setupBenchmarkRouter(b, logger)
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
@@ -89,7 +89,7 @@ func BenchmarkMiddlewareWithBodyAndHeaders(b *testing.B) {
 		AreHeadersDump: true,
 		IsBodyDump:     true,
 	})
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
@@ -144,7 +144,7 @@ func BenchmarkMiddlewareWithBodySkipper(b *testing.B) {
 	logger := setupBenchmarkLogger(b)
 	router := setupBenchmarkRouter(b, logger, ZapConfig{
 		IsBodyDump: true,
-		BodySkipper: func(c *echo.Context) (skipReq, skipResp bool) {
+		BodySkipper: func(*echo.Context) (skipReq, skipResp bool) {
 			return true, true // Always skip both request and response bodies
 		},
 	})
@@ -171,7 +171,7 @@ func BenchmarkMiddlewareWithContextLogger(b *testing.B) {
 		return c.String(http.StatusOK, "ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
@@ -191,7 +191,7 @@ func BenchmarkMiddlewareWithCustomSkipper(b *testing.B) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ping", http.NoBody)
 	w := httptest.NewRecorder()
 
 	b.ReportAllocs()
