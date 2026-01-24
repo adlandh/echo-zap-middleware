@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/adlandh/response-dumper"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -36,7 +36,7 @@ func restoreRequestBody(original io.ReadCloser, captured []byte, useOriginal boo
 
 // prepareReqAndResp sets up request body capture and response dumping if enabled in config.
 // Returns the response dumper and captured request body.
-func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []byte) {
+func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []byte) {
 	// If body dumping is not enabled, return nil values
 	if !config.IsBodyDump {
 		return nil, nil
@@ -74,8 +74,19 @@ func prepareReqAndResp(c echo.Context, config ZapConfig) (*response.Dumper, []by
 	}
 
 	// Set up response dumper
-	respDumper := response.NewDumper(c.Response().Writer)
-	c.Response().Writer = respDumper
+	respWriter := c.Response()
+
+	echoResp, err := echo.UnwrapResponse(respWriter)
+	if err != nil {
+		respDumper := response.NewDumper(respWriter)
+		c.SetResponse(respDumper)
+
+		return respDumper, reqBody
+	}
+
+	respDumper := response.NewDumper(echoResp.ResponseWriter)
+	echoResp.ResponseWriter = respDumper
+	c.SetResponse(echoResp)
 
 	return respDumper, reqBody
 }
@@ -139,7 +150,7 @@ func limitBody(config ZapConfig, str string) string {
 }
 
 // getRequestID extracts the request ID from headers, checking both request and response headers.
-func getRequestID(ctx echo.Context) string {
+func getRequestID(ctx *echo.Context) string {
 	// First check request header (usually set by reverse-proxy)
 	requestID := ctx.Request().Header.Get(echo.HeaderXRequestID)
 	if requestID == "" {
@@ -180,7 +191,7 @@ func addHeaders(config ZapConfig, reqHeaders http.Header, resHeaders http.Header
 
 // addBody adds request and response body fields to the log if body dumping is enabled.
 // Bodies can be excluded based on the BodySkipper function in the config.
-func addBody(config ZapConfig, c echo.Context, reqBody string, respDumper *response.Dumper) []zapcore.Field {
+func addBody(config ZapConfig, c *echo.Context, reqBody string, respDumper *response.Dumper) []zapcore.Field {
 	if !config.IsBodyDump {
 		return nil
 	}
@@ -209,4 +220,20 @@ func addBody(config ZapConfig, c echo.Context, reqBody string, respDumper *respo
 	fields = append(fields, zap.String("resp.body", respBodyContent))
 
 	return fields
+}
+
+func responseStatus(c *echo.Context) (status int, committed bool) {
+	resp, err := echo.UnwrapResponse(c.Response())
+	if err == nil && resp != nil {
+		return resp.Status, resp.Committed
+	}
+
+	if dumper, ok := c.Response().(*response.Dumper); ok {
+		status = dumper.StatusCode()
+		committed = dumper.BytesWritten() > 0 || status != 0
+
+		return status, committed
+	}
+
+	return 0, false
 }
