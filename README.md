@@ -20,7 +20,7 @@ A powerful and configurable middleware for the [Echo](https://github.com/labstac
 ## Installation
 
 ```shell
-go get github.com/adlandh/echo-zap-middleware
+go get github.com/adlandh/echo-zap-middleware/v2
 ```
 
 ## Basic Usage
@@ -31,7 +31,7 @@ package main
 import (
 	"net/http"
 
-	echo_zap_middleware "github.com/adlandh/echo-zap-middleware"
+	echo_zap_middleware "github.com/adlandh/echo-zap-middleware/v2"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
@@ -121,7 +121,7 @@ import (
 	"net/http"
 
 	contextlogger "github.com/adlandh/context-logger"
-	echo_zap_middleware "github.com/adlandh/echo-zap-middleware"
+	echo_zap_middleware "github.com/adlandh/echo-zap-middleware/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -159,7 +159,7 @@ package main
 import (
 	"net/http"
 
-	echo_zap_middleware "github.com/adlandh/echo-zap-middleware"
+	echo_zap_middleware "github.com/adlandh/echo-zap-middleware/v2"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
