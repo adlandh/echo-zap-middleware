@@ -1,7 +1,7 @@
 # Echo Zap Middleware
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/adlandh/echo-zap-middleware.svg)](https://pkg.go.dev/github.com/adlandh/echo-zap-middleware)
-[![Go Report Card](https://goreportcard.com/badge/github.com/adlandh/echo-zap-middleware)](https://goreportcard.com/report/github.com/adlandh/echo-zap-middleware)
+[![Go Reference](https://pkg.go.dev/badge/github.com/adlandh/echo-zap-middleware/v2.svg)](https://pkg.go.dev/github.com/adlandh/echo-zap-middleware/v2)
+[![Go Report Card](https://goreportcard.com/badge/github.com/adlandh/echo-zap-middleware/v2)](https://goreportcard.com/report/github.com/adlandh/echo-zap-middleware/v2)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/adlandh/echo-zap-middleware)](https://github.com/adlandh/echo-zap-middleware)
 
 A powerful and configurable middleware for the [Echo](https://github.com/labstack/echo) web framework that integrates with [Zap](https://github.com/uber-go/zap) logger. This middleware provides detailed request/response logging with customizable options for headers and body capture, request ID tracking, and intelligent log level selection based on HTTP status codes.
