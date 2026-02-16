@@ -3,7 +3,7 @@ module github.com/adlandh/echo-zap-middleware/v2
 go 1.25.0
 
 require (
-	github.com/adlandh/context-logger v1.4.0
+	github.com/adlandh/context-logger v1.5.2
 	github.com/adlandh/response-dumper v1.2.1
 	github.com/labstack/echo/v5 v5.0.4
 	github.com/stretchr/testify v1.11.1
