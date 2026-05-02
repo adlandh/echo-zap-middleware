@@ -7,7 +7,7 @@ require (
 	github.com/adlandh/response-dumper v1.2.1
 	github.com/labstack/echo/v5 v5.1.0
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 )
 
 require (
