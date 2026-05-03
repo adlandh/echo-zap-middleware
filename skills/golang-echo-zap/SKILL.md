@@ -1,3 +1,8 @@
+---
+name: golang-echo-zap
+description: Use when adding or configuring github.com/adlandh/echo-zap-middleware/v2 in a Go Echo service.
+---
+
 # golang-echo-zap
 
 Use this skill when adding or configuring `github.com/adlandh/echo-zap-middleware/v2` in a Go Echo service.
