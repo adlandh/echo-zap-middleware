@@ -145,6 +145,25 @@ func TestPrepareReqAndResp_PartialReadErrorReplaysCapturedBody(t *testing.T) {
 	require.Equal(t, "hello", string(readBody))
 }
 
+func TestPrepareReqAndResp_LimitHTTPBodyPartialReadErrorReplaysCapturedBody(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/", http.NoBody)
+	req.Body = &partialErrReadCloser{}
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	respDumper, reqBody := prepareReqAndResp(ctx, ZapConfig{IsBodyDump: true, LimitHTTPBody: true, LimitSize: 1024})
+
+	require.NotNil(t, respDumper)
+	require.Equal(t, "hello", string(reqBody))
+
+	readBody, err := io.ReadAll(ctx.Request().Body)
+	require.NoError(t, err)
+	require.Equal(t, "hello", string(readBody))
+}
+
 func TestLimitBytes(t *testing.T) {
 	t.Parallel()
 
