@@ -21,6 +21,11 @@ func (r readCloser) Close() error {
 	return r.closeFunc()
 }
 
+// restoreRequestBody returns an io.ReadCloser that replays the captured prefix
+// followed (when useOriginal is true) by whatever is left on the original body.
+// In the useOriginal path Close delegates to the original body; callers should
+// drain the body fully before closing it, otherwise the underlying HTTP/1.1
+// connection may not be reusable.
 func restoreRequestBody(original io.ReadCloser, captured []byte, useOriginal bool) io.ReadCloser {
 	if useOriginal {
 		replay := bytes.NewBuffer(captured)
@@ -118,9 +123,14 @@ func limitString(str string, size int) string {
 	return string(validBytes)
 }
 
-// limitStringWithDots truncates a string and adds "..." if truncated.
+// limitStringWithDots truncates a string and appends "..." if truncation
+// occurred.
+//
+// When size <= 10 the trailing dots are intentionally omitted: at small
+// budgets, three of the few available bytes spent on an ellipsis are more
+// costly than the missing truncation signal. Callers that need a visible
+// indicator at small sizes should configure a larger LimitSize.
 func limitStringWithDots(str string, size int) string {
-	// For very small sizes, just truncate without dots
 	if size <= 10 {
 		return limitString(str, size)
 	}
@@ -136,17 +146,61 @@ func limitStringWithDots(str string, size int) string {
 	return result + "..."
 }
 
-// limitBody applies size limits to HTTP body content if configured.
-func limitBody(config ZapConfig, str string) string {
-	if !config.LimitHTTPBody {
-		return str
+// limitBytesWithDots is the []byte counterpart to limitStringWithDots. It
+// always returns a fresh slice when truncation occurs so callers can safely
+// retain the result without aliasing the source buffer.
+func limitBytesWithDots(b []byte, size int) []byte {
+	if size <= 10 {
+		return limitBytes(b, size)
 	}
 
-	if config.LimitSize <= 0 {
-		return str
+	truncated := limitBytes(b, size-3)
+	if len(truncated) == len(b) {
+		return b
 	}
 
-	return limitStringWithDots(str, config.LimitSize)
+	out := make([]byte, len(truncated)+3)
+	copy(out, truncated)
+	copy(out[len(truncated):], "...")
+
+	return out
+}
+
+// limitBytes truncates b to at most size bytes, trimming any trailing partial
+// UTF-8 sequence so the result remains valid UTF-8.
+func limitBytes(b []byte, size int) []byte {
+	if size <= 0 {
+		return nil
+	}
+
+	if len(b) <= size {
+		return b
+	}
+
+	valid := b[:size]
+	for !utf8.Valid(valid) && len(valid) > 0 {
+		valid = valid[:len(valid)-1]
+	}
+
+	return valid
+}
+
+// limitBody applies the configured size limit to a body byte slice.
+func limitBody(config ZapConfig, b []byte) []byte {
+	if !config.LimitHTTPBody || config.LimitSize <= 0 {
+		return b
+	}
+
+	return limitBytesWithDots(b, config.LimitSize)
+}
+
+// limitBodyString applies the configured size limit to a body string.
+func limitBodyString(config ZapConfig, s string) string {
+	if !config.LimitHTTPBody || config.LimitSize <= 0 {
+		return s
+	}
+
+	return limitStringWithDots(s, config.LimitSize)
 }
 
 // getRequestID extracts the request ID from headers, checking both request and response headers.
@@ -162,9 +216,9 @@ func getRequestID(ctx *echo.Context) string {
 }
 
 // logit logs the request with appropriate level based on HTTP status code.
-func logit(commited bool, status int, logger *zap.Logger, fields []zapcore.Field) {
+func logit(committed bool, status int, logger *zap.Logger, fields []zapcore.Field) {
 	switch {
-	case !commited:
+	case !committed:
 		logger.Warn("Response not committed", fields...)
 	case status >= 500:
 		logger.Error("Server error", fields...)
@@ -178,20 +232,56 @@ func logit(commited bool, status int, logger *zap.Logger, fields []zapcore.Field
 }
 
 // addHeaders adds request and response headers to log fields if enabled in config.
+// Header values listed in config.RedactHeaders are replaced with "[REDACTED]"
+// to avoid leaking secrets such as Authorization tokens or session cookies.
 func addHeaders(config ZapConfig, reqHeaders http.Header, resHeaders http.Header) []zapcore.Field {
 	if !config.AreHeadersDump {
 		return nil
 	}
 
 	return []zapcore.Field{
-		zap.Any("req.headers", reqHeaders),
-		zap.Any("resp.headers", resHeaders),
+		zap.Any("req.headers", redactHeaders(reqHeaders, config.RedactHeaders)),
+		zap.Any("resp.headers", redactHeaders(resHeaders, config.RedactHeaders)),
 	}
+}
+
+// redactHeaders returns a copy of h with the values of any header listed in
+// redact (matched case-insensitively) replaced by "[REDACTED]". The input
+// header map is never mutated. When redact is empty the original map is
+// returned unchanged.
+func redactHeaders(h http.Header, redact []string) http.Header {
+	if len(redact) == 0 || len(h) == 0 {
+		return h
+	}
+
+	redactSet := make(map[string]struct{}, len(redact))
+	for _, name := range redact {
+		redactSet[http.CanonicalHeaderKey(name)] = struct{}{}
+	}
+
+	out := make(http.Header, len(h))
+
+	for name, values := range h {
+		if _, ok := redactSet[http.CanonicalHeaderKey(name)]; ok {
+			masked := make([]string, len(values))
+			for i := range values {
+				masked[i] = "[REDACTED]"
+			}
+
+			out[name] = masked
+
+			continue
+		}
+
+		out[name] = values
+	}
+
+	return out
 }
 
 // addBody adds request and response body fields to the log if body dumping is enabled.
 // Bodies can be excluded based on the BodySkipper function in the config.
-func addBody(config ZapConfig, c *echo.Context, reqBody string, respDumper *response.Dumper) []zapcore.Field {
+func addBody(config ZapConfig, c *echo.Context, reqBody []byte, respDumper *response.Dumper) []zapcore.Field {
 	if !config.IsBodyDump {
 		return nil
 	}
@@ -205,14 +295,14 @@ func addBody(config ZapConfig, c *echo.Context, reqBody string, respDumper *resp
 
 	// Process request body
 	reqBodyContent := limitBody(config, reqBody)
-	if reqBodyContent != "" && skipReq {
-		reqBodyContent = "[excluded]"
+	if len(reqBodyContent) > 0 && skipReq {
+		fields = append(fields, zap.String("req.body", "[excluded]"))
+	} else {
+		fields = append(fields, zap.ByteString("req.body", reqBodyContent))
 	}
 
-	fields = append(fields, zap.String("req.body", reqBodyContent))
-
 	// Process response body
-	respBodyContent := limitBody(config, respDumper.GetResponse())
+	respBodyContent := limitBodyString(config, respDumper.GetResponse())
 	if respBodyContent != "" && skipResp {
 		respBodyContent = "[excluded]"
 	}
@@ -222,17 +312,15 @@ func addBody(config ZapConfig, c *echo.Context, reqBody string, respDumper *resp
 	return fields
 }
 
+// responseStatus reports the HTTP status written so far and whether the
+// response has been committed. In normal Echo flow c.Response() is always an
+// *echo.Response, so the unwrap succeeds; the (0, false) fallback is only
+// reached if a caller has swapped in a non-Echo response (unusual) and is
+// indistinguishable from a handler that never wrote anything.
 func responseStatus(c *echo.Context) (status int, committed bool) {
 	resp, err := echo.UnwrapResponse(c.Response())
 	if err == nil && resp != nil {
 		return resp.Status, resp.Committed
-	}
-
-	if dumper, ok := c.Response().(*response.Dumper); ok {
-		status = dumper.StatusCode()
-		committed = dumper.BytesWritten() > 0 || status != 0
-
-		return status, committed
 	}
 
 	return 0, false

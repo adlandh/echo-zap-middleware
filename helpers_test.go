@@ -146,13 +146,26 @@ func TestLimitBody(t *testing.T) {
 	t.Parallel()
 
 	config := ZapConfig{LimitHTTPBody: true, LimitSize: 12}
-	require.Equal(t, "012345678...", limitBody(config, "0123456789ABCDEF"))
+	require.Equal(t, []byte("012345678..."), limitBody(config, []byte("0123456789ABCDEF")))
 
 	config = ZapConfig{LimitHTTPBody: false, LimitSize: 12}
-	require.Equal(t, "0123456789ABCDEF", limitBody(config, "0123456789ABCDEF"))
+	require.Equal(t, []byte("0123456789ABCDEF"), limitBody(config, []byte("0123456789ABCDEF")))
 
 	config = ZapConfig{LimitHTTPBody: true, LimitSize: 0}
-	require.Equal(t, "0123456789ABCDEF", limitBody(config, "0123456789ABCDEF"))
+	require.Equal(t, []byte("0123456789ABCDEF"), limitBody(config, []byte("0123456789ABCDEF")))
+}
+
+func TestLimitBodyString(t *testing.T) {
+	t.Parallel()
+
+	config := ZapConfig{LimitHTTPBody: true, LimitSize: 12}
+	require.Equal(t, "012345678...", limitBodyString(config, "0123456789ABCDEF"))
+
+	config = ZapConfig{LimitHTTPBody: false, LimitSize: 12}
+	require.Equal(t, "0123456789ABCDEF", limitBodyString(config, "0123456789ABCDEF"))
+
+	config = ZapConfig{LimitHTTPBody: true, LimitSize: 0}
+	require.Equal(t, "0123456789ABCDEF", limitBodyString(config, "0123456789ABCDEF"))
 }
 
 func TestGetRequestID(t *testing.T) {
@@ -226,6 +239,31 @@ func TestAddHeaders(t *testing.T) {
 	require.Equal(t, "resp.headers", fields[1].Key)
 }
 
+func TestRedactHeaders(t *testing.T) {
+	t.Parallel()
+
+	h := http.Header{
+		"Authorization": []string{"Bearer secret"},
+		"Cookie":        []string{"sid=abc", "tracking=xyz"},
+		"X-Trace-Id":    []string{"123"},
+	}
+
+	out := redactHeaders(h, DefaultRedactHeaders)
+	require.Equal(t, []string{"[REDACTED]"}, out["Authorization"])
+	require.Equal(t, []string{"[REDACTED]", "[REDACTED]"}, out["Cookie"])
+	require.Equal(t, []string{"123"}, out["X-Trace-Id"])
+	// Original map is not mutated.
+	require.Equal(t, []string{"Bearer secret"}, h["Authorization"])
+
+	// Empty redact list returns input unchanged.
+	require.Equal(t, h, redactHeaders(h, nil))
+
+	// Case-insensitive matching.
+	mixed := http.Header{"authorization": []string{"Bearer secret"}}
+	out = redactHeaders(mixed, []string{"AUTHORIZATION"})
+	require.Equal(t, []string{"[REDACTED]"}, out["authorization"])
+}
+
 func TestAddBody(t *testing.T) {
 	t.Parallel()
 
@@ -238,7 +276,7 @@ func TestAddBody(t *testing.T) {
 	_, err := respDumper.Write([]byte("response"))
 	require.NoError(t, err)
 
-	fields := addBody(ZapConfig{IsBodyDump: false}, ctx, "request", respDumper)
+	fields := addBody(ZapConfig{IsBodyDump: false}, ctx, []byte("request"), respDumper)
 	require.Nil(t, fields)
 
 	config := ZapConfig{
@@ -248,7 +286,7 @@ func TestAddBody(t *testing.T) {
 			return true, true
 		},
 	}
-	fields = addBody(config, ctx, "request", respDumper)
+	fields = addBody(config, ctx, []byte("request"), respDumper)
 	require.Len(t, fields, 2)
 	require.Equal(t, "[excluded]", fields[0].String)
 	require.Equal(t, "[excluded]", fields[1].String)
@@ -261,9 +299,9 @@ func TestAddBody(t *testing.T) {
 			return false, false
 		},
 	}
-	fields = addBody(config, ctx, "0123456789ABCDEF", respDumper)
+	fields = addBody(config, ctx, []byte("0123456789ABCDEF"), respDumper)
 	require.Len(t, fields, 2)
-	require.Equal(t, "012345678...", fields[0].String)
+	require.Equal(t, "012345678...", string(fields[0].Interface.([]byte)))
 	require.Equal(t, "response", fields[1].String)
 
 	config = ZapConfig{
@@ -274,8 +312,8 @@ func TestAddBody(t *testing.T) {
 			return false, false
 		},
 	}
-	fields = addBody(config, ctx, "0123456789ABCDEF", respDumper)
+	fields = addBody(config, ctx, []byte("0123456789ABCDEF"), respDumper)
 	require.Len(t, fields, 2)
-	require.Equal(t, "0123456789ABCDEF", fields[0].String)
+	require.Equal(t, "0123456789ABCDEF", string(fields[0].Interface.([]byte)))
 	require.Equal(t, "response", fields[1].String)
 }
