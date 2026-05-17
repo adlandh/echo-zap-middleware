@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -41,6 +42,12 @@ type MemorySink struct {
 func (*MemorySink) Close() error { return nil }
 func (*MemorySink) Sync() error  { return nil }
 
+var (
+	testMemorySink   = &MemorySink{new(bytes.Buffer)}
+	registerSinkOnce sync.Once
+	registerSinkErr  error
+)
+
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sink         *MemorySink
@@ -52,17 +59,20 @@ type MiddlewareTestSuite struct {
 }
 
 func (s *MiddlewareTestSuite) SetupSuite() {
-	s.sink = &MemorySink{new(bytes.Buffer)}
-	err := zap.RegisterSink("memory", func(*url.URL) (zap.Sink, error) {
-		return s.sink, nil
+	s.sink = testMemorySink
+	registerSinkOnce.Do(func() {
+		registerSinkErr = zap.RegisterSink("memory", func(*url.URL) (zap.Sink, error) {
+			return testMemorySink, nil
+		})
 	})
-	s.Require().NoError(err)
+	s.Require().NoError(registerSinkErr)
 
 	conf := zap.NewDevelopmentConfig()
 	// Redirect all messages to the MemorySink.
 	conf.OutputPaths = []string{"memory://"}
-	s.logger, err = conf.Build()
+	logger, err := conf.Build()
 	s.Require().NoError(err)
+	s.logger = logger
 	s.ctxLogger = contextlogger.WithContext(s.logger, contextlogger.WithValueExtractor(requestID))
 }
 

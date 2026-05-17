@@ -90,6 +90,24 @@ func (errReadCloser) Close() error {
 	return nil
 }
 
+type partialErrReadCloser struct {
+	read bool
+}
+
+func (r *partialErrReadCloser) Read(p []byte) (int, error) {
+	if r.read {
+		return 0, io.EOF
+	}
+
+	r.read = true
+
+	return copy(p, "hello"), io.ErrUnexpectedEOF
+}
+
+func (*partialErrReadCloser) Close() error {
+	return nil
+}
+
 func TestPrepareReqAndResp_ReadErrorRestoresBody(t *testing.T) {
 	t.Parallel()
 
@@ -106,6 +124,44 @@ func TestPrepareReqAndResp_ReadErrorRestoresBody(t *testing.T) {
 	require.Empty(t, reqBody)
 	_, ok := ctx.Request().Body.(errReadCloser)
 	require.True(t, ok)
+}
+
+func TestPrepareReqAndResp_PartialReadErrorReplaysCapturedBody(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/", http.NoBody)
+	req.Body = &partialErrReadCloser{}
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	respDumper, reqBody := prepareReqAndResp(ctx, ZapConfig{IsBodyDump: true})
+
+	require.NotNil(t, respDumper)
+	require.Equal(t, "hello", string(reqBody))
+
+	readBody, err := io.ReadAll(ctx.Request().Body)
+	require.NoError(t, err)
+	require.Equal(t, "hello", string(readBody))
+}
+
+func TestPrepareReqAndResp_LimitHTTPBodyPartialReadErrorReplaysCapturedBody(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/", http.NoBody)
+	req.Body = &partialErrReadCloser{}
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	respDumper, reqBody := prepareReqAndResp(ctx, ZapConfig{IsBodyDump: true, LimitHTTPBody: true, LimitSize: 1024})
+
+	require.NotNil(t, respDumper)
+	require.Equal(t, "hello", string(reqBody))
+
+	readBody, err := io.ReadAll(ctx.Request().Body)
+	require.NoError(t, err)
+	require.Equal(t, "hello", string(readBody))
 }
 
 func TestLimitBytes(t *testing.T) {
