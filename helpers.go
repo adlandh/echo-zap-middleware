@@ -62,14 +62,14 @@ func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []b
 
 			reqBody, err = io.ReadAll(limitedReader)
 			if err != nil {
-				req.Body = originalBody
+				req.Body = restoreRequestBodyAfterReadError(originalBody, reqBody)
 			} else {
 				req.Body = restoreRequestBody(originalBody, reqBody, true)
 			}
 		} else {
 			reqBody, err = io.ReadAll(req.Body)
 			if err != nil {
-				req.Body = originalBody
+				req.Body = restoreRequestBodyAfterReadError(originalBody, reqBody)
 			} else {
 				_ = req.Body.Close()
 				// Reset original request body so it can be read again by handlers
@@ -94,6 +94,14 @@ func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []b
 	c.SetResponse(echoResp)
 
 	return respDumper, reqBody
+}
+
+func restoreRequestBodyAfterReadError(original io.ReadCloser, captured []byte) io.ReadCloser {
+	if len(captured) == 0 {
+		return original
+	}
+
+	return restoreRequestBody(original, captured, true)
 }
 
 // limitBytes truncates b to at most size bytes, trimming any trailing partial
