@@ -40,8 +40,15 @@ type ZapConfig struct {
 	// If skipRespBody is true, the response body will be marked as "[excluded]" in logs.
 	BodySkipper BodySkipper
 
+	// RedactHeaders lists header names whose values are replaced with "[REDACTED]"
+	// when AreHeadersDump is enabled. Matched case-insensitively.
+	// When nil, DefaultRedactHeaders is used. Set to an empty (non-nil) slice
+	// to disable redaction entirely.
+	RedactHeaders []string
+
 	// AreHeadersDump controls whether request and response headers are included in logs.
 	// When true, all headers will be logged as structured fields.
+	// Sensitive headers listed in RedactHeaders are redacted before logging.
 	AreHeadersDump bool
 
 	// IsBodyDump controls whether request and response bodies are included in logs.
@@ -58,11 +65,23 @@ type ZapConfig struct {
 	LimitSize int
 }
 
+// DefaultRedactHeaders lists header names whose values are redacted by default
+// when header dumping is enabled. Names are matched case-insensitively.
+var DefaultRedactHeaders = []string{
+	"Authorization",
+	"Proxy-Authorization",
+	"Cookie",
+	"Set-Cookie",
+	"X-Api-Key",
+	"X-Auth-Token",
+}
+
 var (
 	// DefaultZapConfig is the default Zap Logger middleware config.
 	DefaultZapConfig = ZapConfig{
 		Skipper:        middleware.DefaultSkipper,
 		BodySkipper:    defaultBodySkipper,
+		RedactHeaders:  DefaultRedactHeaders,
 		AreHeadersDump: false,
 		IsBodyDump:     false,
 		LimitHTTPBody:  true,
@@ -78,7 +97,7 @@ func createLogFields(c *echo.Context, start time.Time) []zapcore.Field {
 	fields := make([]zapcore.Field, 0, 8)
 	fields = append(fields,
 		zap.Int("status", status),
-		zap.String("latency", time.Since(start).String()),
+		zap.Duration("latency", time.Since(start)),
 		zap.String("request_id", getRequestID(c)),
 		zap.String("method", req.Method),
 		zap.String("uri", req.RequestURI),
@@ -113,14 +132,13 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 
 			// Set up body dumping if enabled
 			if config.IsBodyDump {
-				defer func() {
-					c.SetRequest(req.WithContext(ctx))
-				}()
-
 				respDumper, reqBody = prepareReqAndResp(c, config)
 			}
 
-			// Process the request
+			// Invoke the handler chain. We render the error via the configured
+			// HTTPErrorHandler here (instead of returning it) so the response is
+			// committed before we read its status for logging; we then return nil
+			// so Echo does not invoke HTTPErrorHandler a second time.
 			err := next(c)
 			if err != nil {
 				c.Echo().HTTPErrorHandler(c, err)
@@ -133,7 +151,7 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 			fields = append(fields, addHeaders(config, req.Header, c.Response().Header())...)
 
 			// Add request/response body if configured
-			fields = append(fields, addBody(config, c, string(reqBody), respDumper)...)
+			fields = append(fields, addBody(config, c, reqBody, respDumper)...)
 
 			// Log with appropriate level based on status code and commit status
 			status, committed := responseStatus(c)
@@ -171,6 +189,12 @@ func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config 
 	// Ensure BodySkipper is set
 	if config[0].BodySkipper == nil {
 		config[0].BodySkipper = defaultBodySkipper
+	}
+
+	// Apply default redaction list only when the field was left nil. An
+	// explicitly empty (non-nil) slice means the caller opted out of redaction.
+	if config[0].RedactHeaders == nil {
+		config[0].RedactHeaders = DefaultRedactHeaders
 	}
 
 	return makeHandler(ctxLogger, config[0])
