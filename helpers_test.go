@@ -112,18 +112,22 @@ func TestLimitBytes(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no truncation", func(t *testing.T) {
+		t.Parallel()
 		require.Equal(t, []byte("hello"), limitBytes([]byte("hello"), 10))
 	})
 
 	t.Run("size zero returns nil", func(t *testing.T) {
+		t.Parallel()
 		require.Nil(t, limitBytes([]byte("hello"), 0))
 	})
 
 	t.Run("negative size returns nil", func(t *testing.T) {
+		t.Parallel()
 		require.Nil(t, limitBytes([]byte("hello"), -1))
 	})
 
 	t.Run("truncates invalid utf8 bytes", func(t *testing.T) {
+		t.Parallel()
 		euro := []byte{0xE2, 0x82, 0xAC}
 		input := append([]byte("ab"), euro...)
 		input = append(input, []byte("cd")...)
@@ -131,6 +135,7 @@ func TestLimitBytes(t *testing.T) {
 	})
 
 	t.Run("only invalid utf8 returns empty", func(t *testing.T) {
+		t.Parallel()
 		require.Empty(t, limitBytes([]byte{0xE2, 0x82}, 1))
 	})
 }
@@ -139,18 +144,22 @@ func TestLimitBytesWithDots(t *testing.T) {
 	t.Parallel()
 
 	t.Run("size ten keeps no dots", func(t *testing.T) {
+		t.Parallel()
 		require.Equal(t, []byte("0123456789"), limitBytesWithDots([]byte("0123456789ABC"), 10))
 	})
 
 	t.Run("size four keeps no dots", func(t *testing.T) {
+		t.Parallel()
 		require.Equal(t, []byte("0123"), limitBytesWithDots([]byte("0123456789"), 4))
 	})
 
 	t.Run("truncated adds dots", func(t *testing.T) {
+		t.Parallel()
 		require.Equal(t, []byte("012345678..."), limitBytesWithDots([]byte("0123456789ABCDEF"), 12))
 	})
 
 	t.Run("no truncation keeps original", func(t *testing.T) {
+		t.Parallel()
 		require.Equal(t, []byte("short"), limitBytesWithDots([]byte("short"), 20))
 	})
 }
@@ -258,10 +267,11 @@ func TestRedactHeaders(t *testing.T) {
 	// Empty redact list returns input unchanged.
 	require.Equal(t, h, redactHeaders(h, nil))
 
-	// Case-insensitive matching.
-	mixed := http.Header{"authorization": []string{"Bearer secret"}}
-	out = redactHeaders(mixed, []string{"AUTHORIZATION"})
-	require.Equal(t, []string{"[REDACTED]"}, out["authorization"])
+	// Case-insensitive matching: redact entry may be non-canonical.
+	canonical := http.Header{}
+	canonical.Set("Authorization", "Bearer secret")
+	out = redactHeaders(canonical, []string{"AUTHORIZATION"})
+	require.Equal(t, []string{"[REDACTED]"}, out.Values("Authorization"))
 }
 
 func TestAddBody(t *testing.T) {
