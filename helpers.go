@@ -96,78 +96,9 @@ func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []b
 	return respDumper, reqBody
 }
 
-// limitString truncates a string to the specified size while ensuring UTF-8 validity.
-func limitString(str string, size int) string {
-	if size <= 0 {
-		return ""
-	}
-
-	// Quick check if truncation is needed
-	if len(str) <= size {
-		return str
-	}
-
-	if utf8.ValidString(str[:size]) {
-		return str[:size]
-	}
-
-	// Convert to bytes for UTF-8 handling
-	strBytes := []byte(str)
-
-	// Truncate and ensure UTF-8 validity
-	validBytes := strBytes[:size]
-	for !utf8.Valid(validBytes) && len(validBytes) > 0 {
-		validBytes = validBytes[:len(validBytes)-1]
-	}
-
-	return string(validBytes)
-}
-
-// limitStringWithDots truncates a string and appends "..." if truncation
-// occurred.
-//
-// When size <= 10 the trailing dots are intentionally omitted: at small
-// budgets, three of the few available bytes spent on an ellipsis are more
-// costly than the missing truncation signal. Callers that need a visible
-// indicator at small sizes should configure a larger LimitSize.
-func limitStringWithDots(str string, size int) string {
-	if size <= 10 {
-		return limitString(str, size)
-	}
-
-	// Reserve space for "..." if needed
-	result := limitString(str, size-3)
-
-	// If no truncation occurred, return original string
-	if result == str {
-		return str
-	}
-
-	return result + "..."
-}
-
-// limitBytesWithDots is the []byte counterpart to limitStringWithDots. It
-// always returns a fresh slice when truncation occurs so callers can safely
-// retain the result without aliasing the source buffer.
-func limitBytesWithDots(b []byte, size int) []byte {
-	if size <= 10 {
-		return limitBytes(b, size)
-	}
-
-	truncated := limitBytes(b, size-3)
-	if len(truncated) == len(b) {
-		return b
-	}
-
-	out := make([]byte, len(truncated)+3)
-	copy(out, truncated)
-	copy(out[len(truncated):], "...")
-
-	return out
-}
-
 // limitBytes truncates b to at most size bytes, trimming any trailing partial
-// UTF-8 sequence so the result remains valid UTF-8.
+// UTF-8 sequence so the result remains valid UTF-8. A non-positive size yields
+// a nil slice.
 func limitBytes(b []byte, size int) []byte {
 	if size <= 0 {
 		return nil
@@ -185,6 +116,30 @@ func limitBytes(b []byte, size int) []byte {
 	return valid
 }
 
+// limitBytesWithDots truncates b to size bytes and appends "..." if truncation
+// occurred. The returned slice never aliases the input on the truncation path.
+//
+// When size <= 10 the trailing dots are intentionally omitted: at small
+// budgets, the three bytes spent on an ellipsis are more costly than the
+// missing truncation signal. Callers that need a visible indicator at small
+// sizes should configure a larger LimitSize.
+func limitBytesWithDots(b []byte, size int) []byte {
+	if size <= 10 {
+		return limitBytes(b, size)
+	}
+
+	truncated := limitBytes(b, size-3)
+	if len(truncated) == len(b) {
+		return b
+	}
+
+	out := make([]byte, len(truncated)+3)
+	copy(out, truncated)
+	copy(out[len(truncated):], "...")
+
+	return out
+}
+
 // limitBody applies the configured size limit to a body byte slice.
 func limitBody(config ZapConfig, b []byte) []byte {
 	if !config.LimitHTTPBody || config.LimitSize <= 0 {
@@ -192,15 +147,6 @@ func limitBody(config ZapConfig, b []byte) []byte {
 	}
 
 	return limitBytesWithDots(b, config.LimitSize)
-}
-
-// limitBodyString applies the configured size limit to a body string.
-func limitBodyString(config ZapConfig, s string) string {
-	if !config.LimitHTTPBody || config.LimitSize <= 0 {
-		return s
-	}
-
-	return limitStringWithDots(s, config.LimitSize)
 }
 
 // getRequestID extracts the request ID from headers, checking both request and response headers.
@@ -302,12 +248,12 @@ func addBody(config ZapConfig, c *echo.Context, reqBody []byte, respDumper *resp
 	}
 
 	// Process response body
-	respBodyContent := limitBodyString(config, respDumper.GetResponse())
-	if respBodyContent != "" && skipResp {
-		respBodyContent = "[excluded]"
+	respBodyContent := limitBody(config, []byte(respDumper.GetResponse()))
+	if len(respBodyContent) > 0 && skipResp {
+		fields = append(fields, zap.String("resp.body", "[excluded]"))
+	} else {
+		fields = append(fields, zap.ByteString("resp.body", respBodyContent))
 	}
-
-	fields = append(fields, zap.String("resp.body", respBodyContent))
 
 	return fields
 }

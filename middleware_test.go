@@ -319,6 +319,57 @@ func (s *MiddlewareTestSuite) TestBodyLimitApplied() {
 	s.expectMethod = "POST"
 }
 
+func (s *MiddlewareTestSuite) TestHandlerErrorIsRendered() {
+	s.router.Use(Middleware(s.logger))
+	s.router.GET("/ping", func(*echo.Context) error {
+		return echo.NewHTTPError(http.StatusTeapot, "nope")
+	})
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	response := w.Result()
+	s.Equal(http.StatusTeapot, response.StatusCode)
+	s.Contains(s.sink.String(), "Client error")
+	s.Contains(s.sink.String(), "\"status\": 418")
+}
+
+func (s *MiddlewareTestSuite) TestHeaderRedaction() {
+	s.router.Use(Middleware(s.logger, ZapConfig{AreHeadersDump: true}))
+	s.router.GET("/ping", func(c *echo.Context) error {
+		c.Response().Header().Set("Set-Cookie", "sid=secret")
+		return c.String(http.StatusOK, "ok")
+	})
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
+	r.Header.Set("Authorization", "Bearer topsecret")
+	r.Header.Set("X-Trace-Id", "abc123")
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	out := s.sink.String()
+	s.NotContains(out, "topsecret")
+	s.NotContains(out, "sid=secret")
+	s.Contains(out, "[REDACTED]")
+	s.Contains(out, "abc123")
+}
+
+func (s *MiddlewareTestSuite) TestHeaderRedactionDisabled() {
+	s.router.Use(Middleware(s.logger, ZapConfig{
+		AreHeadersDump: true,
+		RedactHeaders:  []string{},
+	}))
+	s.router.GET("/ping", func(c *echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+	r := httptest.NewRequest("GET", "/ping", http.NoBody)
+	r.Header.Set("Authorization", "Bearer topsecret")
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	s.Contains(s.sink.String(), "topsecret")
+	s.NotContains(s.sink.String(), "[REDACTED]")
+}
+
 func (s *MiddlewareTestSuite) TestRequestIDFromResponseHeader() {
 	s.router.Use(Middleware(s.logger))
 	s.router.GET("/ping", func(c *echo.Context) error {

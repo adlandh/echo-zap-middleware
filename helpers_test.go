@@ -108,37 +108,50 @@ func TestPrepareReqAndResp_ReadErrorRestoresBody(t *testing.T) {
 	require.True(t, ok)
 }
 
-func TestLimitString(t *testing.T) {
+func TestLimitBytes(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no truncation", func(t *testing.T) {
-		require.Equal(t, "hello", limitString("hello", 10))
+		require.Equal(t, []byte("hello"), limitBytes([]byte("hello"), 10))
 	})
 
-	t.Run("size zero returns empty", func(t *testing.T) {
-		require.Equal(t, "", limitString("hello", 0))
+	t.Run("size zero returns nil", func(t *testing.T) {
+		require.Nil(t, limitBytes([]byte("hello"), 0))
+	})
+
+	t.Run("negative size returns nil", func(t *testing.T) {
+		require.Nil(t, limitBytes([]byte("hello"), -1))
 	})
 
 	t.Run("truncates invalid utf8 bytes", func(t *testing.T) {
-		euro := string([]byte{0xE2, 0x82, 0xAC})
-		input := "ab" + euro + "cd"
-		require.Equal(t, "ab", limitString(input, 3))
+		euro := []byte{0xE2, 0x82, 0xAC}
+		input := append([]byte("ab"), euro...)
+		input = append(input, []byte("cd")...)
+		require.Equal(t, []byte("ab"), limitBytes(input, 3))
+	})
+
+	t.Run("only invalid utf8 returns empty", func(t *testing.T) {
+		require.Empty(t, limitBytes([]byte{0xE2, 0x82}, 1))
 	})
 }
 
-func TestLimitStringWithDots(t *testing.T) {
+func TestLimitBytesWithDots(t *testing.T) {
 	t.Parallel()
 
 	t.Run("size ten keeps no dots", func(t *testing.T) {
-		require.Equal(t, "0123456789", limitStringWithDots("0123456789ABC", 10))
+		require.Equal(t, []byte("0123456789"), limitBytesWithDots([]byte("0123456789ABC"), 10))
+	})
+
+	t.Run("size four keeps no dots", func(t *testing.T) {
+		require.Equal(t, []byte("0123"), limitBytesWithDots([]byte("0123456789"), 4))
 	})
 
 	t.Run("truncated adds dots", func(t *testing.T) {
-		require.Equal(t, "012345678...", limitStringWithDots("0123456789ABCDEF", 12))
+		require.Equal(t, []byte("012345678..."), limitBytesWithDots([]byte("0123456789ABCDEF"), 12))
 	})
 
 	t.Run("no truncation keeps original", func(t *testing.T) {
-		require.Equal(t, "short", limitStringWithDots("short", 20))
+		require.Equal(t, []byte("short"), limitBytesWithDots([]byte("short"), 20))
 	})
 }
 
@@ -153,19 +166,6 @@ func TestLimitBody(t *testing.T) {
 
 	config = ZapConfig{LimitHTTPBody: true, LimitSize: 0}
 	require.Equal(t, []byte("0123456789ABCDEF"), limitBody(config, []byte("0123456789ABCDEF")))
-}
-
-func TestLimitBodyString(t *testing.T) {
-	t.Parallel()
-
-	config := ZapConfig{LimitHTTPBody: true, LimitSize: 12}
-	require.Equal(t, "012345678...", limitBodyString(config, "0123456789ABCDEF"))
-
-	config = ZapConfig{LimitHTTPBody: false, LimitSize: 12}
-	require.Equal(t, "0123456789ABCDEF", limitBodyString(config, "0123456789ABCDEF"))
-
-	config = ZapConfig{LimitHTTPBody: true, LimitSize: 0}
-	require.Equal(t, "0123456789ABCDEF", limitBodyString(config, "0123456789ABCDEF"))
 }
 
 func TestGetRequestID(t *testing.T) {
@@ -302,7 +302,7 @@ func TestAddBody(t *testing.T) {
 	fields = addBody(config, ctx, []byte("0123456789ABCDEF"), respDumper)
 	require.Len(t, fields, 2)
 	require.Equal(t, "012345678...", string(fields[0].Interface.([]byte)))
-	require.Equal(t, "response", fields[1].String)
+	require.Equal(t, "response", string(fields[1].Interface.([]byte)))
 
 	config = ZapConfig{
 		IsBodyDump:    true,
@@ -315,5 +315,37 @@ func TestAddBody(t *testing.T) {
 	fields = addBody(config, ctx, []byte("0123456789ABCDEF"), respDumper)
 	require.Len(t, fields, 2)
 	require.Equal(t, "0123456789ABCDEF", string(fields[0].Interface.([]byte)))
-	require.Equal(t, "response", fields[1].String)
+	require.Equal(t, "response", string(fields[1].Interface.([]byte)))
+}
+
+func TestResponseStatus_NonEchoResponseFallback(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	// Swap the response for a non-*echo.Response writer so UnwrapResponse fails.
+	ctx.SetResponse(response.NewDumper(rec))
+
+	status, committed := responseStatus(ctx)
+	require.Equal(t, 0, status)
+	require.False(t, committed)
+}
+
+func TestReadCloser_CloseDelegates(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	rc := readCloser{
+		Reader: strings.NewReader(""),
+		closeFunc: func() error {
+			called = true
+			return io.EOF
+		},
+	}
+
+	require.ErrorIs(t, rc.Close(), io.EOF)
+	require.True(t, called)
 }
