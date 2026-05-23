@@ -1,9 +1,9 @@
 github.com/adlandh/context-logger v1.6.4 h1:R82o+Gt86SfAmSO56hHLIJwEH/t9k34p41Nh+TIhazw=
 github.com/adlandh/context-logger v1.6.4/go.mod h1:X6Ot3ksGjoPhMTVZe7nWZMjRR7F0YF5GmoAYOHjcPNI=
-github.com/adlandh/response-dumper v1.2.1 h1:2SrUzY709OyAc7QSgyORYK4RP92waQbH4LCL99aLGTk=
-github.com/adlandh/response-dumper v1.2.1/go.mod h1:nBfsf9BR86Fqg1TOlpQHSJu5eZ/W6Il4ucs+20VsYMs=
-github.com/brianvoe/gofakeit/v7 v7.14.0 h1:R8tmT/rTDJmD2ngpqBL9rAKydiL7Qr2u3CXPqRt59pk=
-github.com/brianvoe/gofakeit/v7 v7.14.0/go.mod h1:QXuPeBw164PJCzCUZVmgpgHJ3Llj49jSLVkKPMtxtxA=
+github.com/adlandh/response-dumper v1.3.0 h1:u1yFxDZ/pFgyilqH0LR23HTHsc1hYKMz1+/pVWrFx9M=
+github.com/adlandh/response-dumper v1.3.0/go.mod h1:2lyYOMhN3WncYnO+InsCWF3M263uZk0rMZU2tjBH0XY=
+github.com/brianvoe/gofakeit/v7 v7.15.0 h1:kGLYAWN8tnmxq2PelKVK6zwpM7kMxdz9SGPH31mFkNs=
+github.com/brianvoe/gofakeit/v7 v7.15.0/go.mod h1:QXuPeBw164PJCzCUZVmgpgHJ3Llj49jSLVkKPMtxtxA=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/labstack/echo/v5 v5.1.1 h1:4QkvKoS8ps5ch49t8b72QS9Z581ytgxhTzxuB/CBA2I=
