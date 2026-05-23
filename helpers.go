@@ -81,15 +81,20 @@ func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []b
 	// Set up response dumper
 	respWriter := c.Response()
 
+	limitDumperBytes := -1
+	if config.LimitHTTPBody && config.LimitSize > 0 {
+		limitDumperBytes = config.LimitSize
+	}
+
 	echoResp, err := echo.UnwrapResponse(respWriter)
 	if err != nil {
-		respDumper := response.NewDumper(respWriter)
+		respDumper := response.NewDumper(respWriter, response.WithMaxBytes(limitDumperBytes))
 		c.SetResponse(respDumper)
 
 		return respDumper, reqBody
 	}
 
-	respDumper := response.NewDumper(echoResp.ResponseWriter)
+	respDumper := response.NewDumper(echoResp.ResponseWriter, response.WithMaxBytes(limitDumperBytes))
 	echoResp.ResponseWriter = respDumper
 	c.SetResponse(echoResp)
 
