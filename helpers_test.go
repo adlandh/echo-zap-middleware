@@ -164,6 +164,21 @@ func TestPrepareReqAndResp_LimitHTTPBodyPartialReadErrorReplaysCapturedBody(t *t
 	require.Equal(t, "hello", string(readBody))
 }
 
+func TestPrepareReqAndResp_NilRequestBody(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	req.Body = nil
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	respDumper, reqBody := prepareReqAndResp(ctx, ZapConfig{IsBodyDump: true})
+
+	require.NotNil(t, respDumper)
+	require.Nil(t, reqBody)
+}
+
 func TestPrepareReqAndResp_NonEchoResponseWriter(t *testing.T) {
 	t.Parallel()
 

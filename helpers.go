@@ -47,36 +47,8 @@ func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []b
 		return nil, nil
 	}
 
-	var reqBody []byte
-
 	req := c.Request()
-
-	// Capture request body if present
-	if req.Body != nil {
-		originalBody := req.Body
-
-		var err error
-
-		if config.LimitHTTPBody && config.LimitSize > 0 {
-			limitedReader := io.LimitReader(req.Body, int64(config.LimitSize)+1)
-
-			reqBody, err = io.ReadAll(limitedReader)
-			if err != nil {
-				req.Body = restoreRequestBodyAfterReadError(originalBody, reqBody)
-			} else {
-				req.Body = restoreRequestBody(originalBody, reqBody, true)
-			}
-		} else {
-			reqBody, err = io.ReadAll(req.Body)
-			if err != nil {
-				req.Body = restoreRequestBodyAfterReadError(originalBody, reqBody)
-			} else {
-				_ = req.Body.Close()
-				// Reset original request body so it can be read again by handlers
-				req.Body = restoreRequestBody(originalBody, reqBody, false)
-			}
-		}
-	}
+	reqBody := captureRequestBody(req, config)
 
 	// Set up response dumper
 	respWriter := c.Response()
@@ -99,6 +71,34 @@ func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []b
 	c.SetResponse(echoResp)
 
 	return respDumper, reqBody
+}
+
+func captureRequestBody(req *http.Request, config ZapConfig) []byte {
+	if req.Body == nil {
+		return nil
+	}
+
+	originalBody := req.Body
+	limited := config.LimitHTTPBody && config.LimitSize > 0
+
+	reader := io.Reader(req.Body)
+	if limited {
+		reader = io.LimitReader(req.Body, int64(config.LimitSize)+1)
+	}
+
+	reqBody, err := io.ReadAll(reader)
+	if err != nil {
+		req.Body = restoreRequestBodyAfterReadError(originalBody, reqBody)
+		return reqBody
+	}
+
+	if !limited {
+		_ = req.Body.Close()
+	}
+
+	req.Body = restoreRequestBody(originalBody, reqBody, limited)
+
+	return reqBody
 }
 
 func restoreRequestBodyAfterReadError(original io.ReadCloser, captured []byte) io.ReadCloser {
