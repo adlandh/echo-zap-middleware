@@ -164,6 +164,43 @@ func TestPrepareReqAndResp_LimitHTTPBodyPartialReadErrorReplaysCapturedBody(t *t
 	require.Equal(t, "hello", string(readBody))
 }
 
+func TestPrepareReqAndResp_NilRequestBody(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	req.Body = nil
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	respDumper, reqBody := prepareReqAndResp(ctx, ZapConfig{IsBodyDump: true})
+
+	require.NotNil(t, respDumper)
+	require.Nil(t, reqBody)
+}
+
+func TestPrepareReqAndResp_NonEchoResponseWriter(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("hello"))
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	// Swap the response for a writer that UnwrapResponse cannot resolve to *echo.Response.
+	ctx.SetResponse(response.NewDumper(rec))
+
+	respDumper, reqBody := prepareReqAndResp(ctx, ZapConfig{
+		IsBodyDump:    true,
+		LimitHTTPBody: true,
+		LimitSize:     4,
+	})
+
+	require.NotNil(t, respDumper)
+	require.Equal(t, "hello", string(reqBody))
+	require.Same(t, respDumper, ctx.Response())
+}
+
 func TestLimitBytes(t *testing.T) {
 	t.Parallel()
 
