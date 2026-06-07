@@ -162,6 +162,32 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 	}
 }
 
+// normalizeConfig returns a ZapConfig with nil fields populated from defaults.
+// When no config is provided, DefaultZapConfig is returned unchanged.
+// When a config is provided, only the nil-able fields (Skipper, BodySkipper,
+// RedactHeaders) are backfilled from defaults; all other fields are preserved.
+func normalizeConfig(config []ZapConfig) ZapConfig {
+	if len(config) == 0 {
+		return DefaultZapConfig
+	}
+
+	cfg := config[0]
+
+	if cfg.Skipper == nil {
+		cfg.Skipper = DefaultZapConfig.Skipper
+	}
+
+	if cfg.BodySkipper == nil {
+		cfg.BodySkipper = DefaultZapConfig.BodySkipper
+	}
+
+	if cfg.RedactHeaders == nil {
+		cfg.RedactHeaders = DefaultZapConfig.RedactHeaders
+	}
+
+	return cfg
+}
+
 // MiddlewareWithContextLogger returns a Zap Logger middleware with context logger.
 // It allows for more advanced logging with context-aware information.
 //
@@ -172,32 +198,13 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 // Returns:
 //   - An Echo middleware function that logs requests and responses
 func MiddlewareWithContextLogger(ctxLogger *contextlogger.ContextLogger, config ...ZapConfig) echo.MiddlewareFunc {
-	// Use default config if none provided
-	if len(config) == 0 {
-		config = []ZapConfig{DefaultZapConfig}
-	}
-
 	if ctxLogger == nil {
 		ctxLogger = contextlogger.WithContext(zap.NewNop())
 	}
 
-	// Ensure Skipper is set
-	if config[0].Skipper == nil {
-		config[0].Skipper = middleware.DefaultSkipper
-	}
+	cfg := normalizeConfig(config)
 
-	// Ensure BodySkipper is set
-	if config[0].BodySkipper == nil {
-		config[0].BodySkipper = defaultBodySkipper
-	}
-
-	// Apply default redaction list only when the field was left nil. An
-	// explicitly empty (non-nil) slice means the caller opted out of redaction.
-	if config[0].RedactHeaders == nil {
-		config[0].RedactHeaders = DefaultRedactHeaders
-	}
-
-	return makeHandler(ctxLogger, config[0])
+	return makeHandler(ctxLogger, cfg)
 }
 
 // Middleware returns a Zap Logger middleware with the provided configuration.

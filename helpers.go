@@ -238,37 +238,29 @@ func redactHeaders(h http.Header, redact []string) http.Header {
 	return out
 }
 
+// bodyField creates a zap field for a body. When skip is true and the body is
+// non-empty the value is replaced with "[excluded]".
+func bodyField(key string, body []byte, skip bool) zapcore.Field {
+	if skip && len(body) > 0 {
+		return zap.String(key, "[excluded]")
+	}
+
+	return zap.ByteString(key, body)
+}
+
 // addBody adds request and response body fields to the log if body dumping is enabled.
 // Bodies can be excluded based on the BodySkipper function in the config.
 func addBody(config ZapConfig, c *echo.Context, reqBody []byte, respDumper *response.Dumper) []zapcore.Field {
-	if !config.IsBodyDump {
-		return nil
-	}
-
-	if respDumper == nil {
+	if !config.IsBodyDump || respDumper == nil {
 		return nil
 	}
 
 	skipReq, skipResp := config.BodySkipper(c)
-	fields := make([]zapcore.Field, 0, 2) // Pre-allocate for 2 fields
 
-	// Process request body
-	reqBodyContent := limitBody(config, reqBody)
-	if len(reqBodyContent) > 0 && skipReq {
-		fields = append(fields, zap.String("req.body", "[excluded]"))
-	} else {
-		fields = append(fields, zap.ByteString("req.body", reqBodyContent))
+	return []zapcore.Field{
+		bodyField("req.body", limitBody(config, reqBody), skipReq),
+		bodyField("resp.body", limitBody(config, []byte(respDumper.GetResponse())), skipResp),
 	}
-
-	// Process response body
-	respBodyContent := limitBody(config, []byte(respDumper.GetResponse()))
-	if len(respBodyContent) > 0 && skipResp {
-		fields = append(fields, zap.String("resp.body", "[excluded]"))
-	} else {
-		fields = append(fields, zap.ByteString("resp.body", respBodyContent))
-	}
-
-	return fields
 }
 
 // responseStatus reports the HTTP status written so far and whether the

@@ -452,3 +452,27 @@ func TestReadCloser_CloseDelegates(t *testing.T) {
 	require.ErrorIs(t, rc.Close(), io.EOF)
 	require.True(t, called)
 }
+
+func TestNormalizeConfig(t *testing.T) {
+	t.Parallel()
+
+	// No config → full defaults.
+	cfg := normalizeConfig(nil)
+	require.Equal(t, DefaultZapConfig.LimitSize, cfg.LimitSize)
+	require.Equal(t, DefaultZapConfig.LimitHTTPBody, cfg.LimitHTTPBody)
+	require.NotNil(t, cfg.Skipper)
+	require.NotNil(t, cfg.BodySkipper)
+	require.NotNil(t, cfg.RedactHeaders)
+
+	// Config provided → nil-able fields backfilled, caller values preserved.
+	cfg = normalizeConfig([]ZapConfig{{LimitSize: 42}})
+	require.NotNil(t, cfg.Skipper)
+	require.NotNil(t, cfg.BodySkipper)
+	require.Equal(t, DefaultZapConfig.RedactHeaders, cfg.RedactHeaders)
+	require.Equal(t, 42, cfg.LimitSize)
+
+	// Explicit empty (non-nil) RedactHeaders → opt-out preserved, not backfilled.
+	cfg = normalizeConfig([]ZapConfig{{RedactHeaders: []string{}}})
+	require.NotNil(t, cfg.RedactHeaders)
+	require.Empty(t, cfg.RedactHeaders)
+}
