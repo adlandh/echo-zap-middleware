@@ -260,6 +260,15 @@ func TestLimitBytesWithDots(t *testing.T) {
 		t.Parallel()
 		require.Equal(t, []byte("short"), limitBytesWithDots([]byte("short"), 20))
 	})
+
+	t.Run("default limit preserves bodies that fit", func(t *testing.T) {
+		t.Parallel()
+
+		for size := DefaultZapConfig.LimitSize - 2; size <= DefaultZapConfig.LimitSize; size++ {
+			body := []byte(strings.Repeat("a", size))
+			require.Equal(t, body, limitBytesWithDots(body, DefaultZapConfig.LimitSize))
+		}
+	})
 }
 
 func TestLimitBody(t *testing.T) {

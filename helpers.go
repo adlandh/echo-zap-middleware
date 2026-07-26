@@ -55,7 +55,7 @@ func prepareReqAndResp(c *echo.Context, config ZapConfig) (*response.Dumper, []b
 
 	limitDumperBytes := -1
 	if config.LimitHTTPBody && config.LimitSize > 0 {
-		limitDumperBytes = config.LimitSize
+		limitDumperBytes = config.LimitSize + 1
 	}
 
 	echoResp, err := echo.UnwrapResponse(respWriter)
@@ -142,6 +142,10 @@ func limitBytes(b []byte, size int) []byte {
 // missing truncation signal. Callers that need a visible indicator at small
 // sizes should configure a larger LimitSize.
 func limitBytesWithDots(b []byte, size int) []byte {
+	if len(b) <= size {
+		return b
+	}
+
 	if size <= 10 {
 		return limitBytes(b, size)
 	}
