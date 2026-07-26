@@ -231,6 +231,11 @@ func TestLimitBytes(t *testing.T) {
 		t.Parallel()
 		require.Empty(t, limitBytes([]byte{0xE2, 0x82}, 1))
 	})
+
+	t.Run("stops at invalid utf8 in the middle", func(t *testing.T) {
+		t.Parallel()
+		require.Equal(t, []byte("ab"), limitBytes([]byte{'a', 'b', 0xff, 'c', 'd'}, 4))
+	})
 }
 
 func TestLimitBytesWithDots(t *testing.T) {
@@ -469,6 +474,26 @@ func TestNormalizeConfig(t *testing.T) {
 	require.NotNil(t, cfg.Skipper)
 	require.NotNil(t, cfg.BodySkipper)
 	require.Equal(t, DefaultZapConfig.RedactHeaders, cfg.RedactHeaders)
+	require.Equal(t, 42, cfg.LimitSize)
+
+	// Enabling body dumping with zero-valued limit settings uses safe defaults.
+	cfg = normalizeConfig([]ZapConfig{{IsBodyDump: true}})
+	require.True(t, cfg.LimitHTTPBody)
+	require.Equal(t, DefaultZapConfig.LimitSize, cfg.LimitSize)
+
+	// A zero size still uses the safe default when the limit flag is provided.
+	cfg = normalizeConfig([]ZapConfig{{IsBodyDump: true, LimitHTTPBody: true}})
+	require.True(t, cfg.LimitHTTPBody)
+	require.Equal(t, DefaultZapConfig.LimitSize, cfg.LimitSize)
+
+	// A negative size explicitly opts out of limiting.
+	cfg = normalizeConfig([]ZapConfig{{IsBodyDump: true, LimitSize: -1}})
+	require.False(t, cfg.LimitHTTPBody)
+	require.Equal(t, -1, cfg.LimitSize)
+
+	// A positive size enables limiting even when the bool has its zero value.
+	cfg = normalizeConfig([]ZapConfig{{IsBodyDump: true, LimitSize: 42}})
+	require.True(t, cfg.LimitHTTPBody)
 	require.Equal(t, 42, cfg.LimitSize)
 
 	// Explicit empty (non-nil) RedactHeaders → opt-out preserved, not backfilled.

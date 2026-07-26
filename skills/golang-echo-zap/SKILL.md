@@ -18,9 +18,10 @@ Use this skill when adding or configuring `github.com/adlandh/echo-zap-middlewar
 - Import path is `github.com/adlandh/echo-zap-middleware/v2`; package name is `echozapmiddleware` unless aliased.
 - `Middleware(logger, config...)` is the normal entrypoint for a `*zap.Logger`.
 - `MiddlewareWithContextLogger(ctxLogger, config...)` is for `github.com/adlandh/context-logger` extractors.
-- `ZapConfig` fills defaults only for nil `Skipper` and nil `BodySkipper`; bool and int zero values are meaningful.
-- `LimitHTTPBody: true` with `LimitSize <= 0` disables body limiting.
-- `BodySkipper` does not prevent body capture; it replaces non-empty logged bodies with `[excluded]`.
+- `ZapConfig` fills nil function fields from defaults. Enabling body dumping with zero-valued limit settings applies the default 500-byte limit.
+- Set `LimitSize` to a negative value to explicitly disable body limiting.
+- `BodySkipper` runs after the handler; skipped bodies are captured up to the configured limit but logged as `[excluded]`.
+- The `uri` field contains the escaped path without query parameters.
 - Request IDs are logged from request `X-Request-Id` first, then from Echo's response header.
 
 ## Minimal Setup
@@ -75,7 +76,7 @@ e.Use(echozapmiddleware.MiddlewareWithContextLogger(ctxLogger))
 ## Implementation Guidance
 - Add `middleware.RequestID()` before this middleware when generated request IDs should appear in logs.
 - Keep body dumping off by default for hot paths; enable `IsBodyDump` only when the service can afford body capture.
-- Use `BodySkipper` for sensitive or binary payloads, but still set `LimitHTTPBody` and `LimitSize` for large bodies.
+- Use `BodySkipper` for sensitive or binary payloads, keep the default capture limit, and add Echo's body-limit middleware before this middleware when request size itself must be bounded.
 - If changing middleware behavior in this repo, preserve downstream request body replay after capture and update README configuration docs.
 
 ## Verify

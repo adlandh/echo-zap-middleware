@@ -56,12 +56,13 @@ type ZapConfig struct {
 	IsBodyDump bool
 
 	// LimitHTTPBody controls whether to limit the size of logged HTTP bodies.
-	// When true, bodies larger than LimitSize will be truncated.
+	// Body dumping automatically enables it for non-negative LimitSize values.
 	LimitHTTPBody bool
 
 	// LimitSize specifies the maximum size (in bytes) for logged HTTP bodies.
 	// Bodies larger than this will be truncated with "..." appended.
-	// Only used when LimitHTTPBody is true; <= 0 disables limiting.
+	// When body dumping is enabled, zero uses the default size. A negative value
+	// explicitly disables limiting.
 	LimitSize int
 }
 
@@ -100,7 +101,7 @@ func createLogFields(c *echo.Context, start time.Time) []zapcore.Field {
 		zap.Duration("latency", time.Since(start)),
 		zap.String("request_id", getRequestID(c)),
 		zap.String("method", req.Method),
-		zap.String("uri", req.RequestURI),
+		zap.String("uri", req.URL.EscapedPath()),
 		zap.String("host", req.Host),
 		zap.String("remote_ip", c.RealIP()),
 	)
@@ -163,15 +164,14 @@ func makeHandler(ctxLogger *contextlogger.ContextLogger, config ZapConfig) echo.
 }
 
 // normalizeConfig returns a ZapConfig with nil fields populated from defaults.
-// When no config is provided, DefaultZapConfig is returned unchanged.
-// When a config is provided, only the nil-able fields (Skipper, BodySkipper,
-// RedactHeaders) are backfilled from defaults; all other fields are preserved.
+// When no config is provided, normalization starts from DefaultZapConfig.
+// When body dumping is enabled, non-negative sizes enable limiting, zero uses
+// the default size, and a negative size explicitly disables limiting.
 func normalizeConfig(config []ZapConfig) ZapConfig {
-	if len(config) == 0 {
-		return DefaultZapConfig
+	cfg := DefaultZapConfig
+	if len(config) > 0 {
+		cfg = config[0]
 	}
-
-	cfg := config[0]
 
 	if cfg.Skipper == nil {
 		cfg.Skipper = DefaultZapConfig.Skipper
@@ -183,6 +183,17 @@ func normalizeConfig(config []ZapConfig) ZapConfig {
 
 	if cfg.RedactHeaders == nil {
 		cfg.RedactHeaders = DefaultZapConfig.RedactHeaders
+	}
+
+	if cfg.IsBodyDump {
+		if cfg.LimitSize < 0 {
+			cfg.LimitHTTPBody = false
+		} else {
+			cfg.LimitHTTPBody = true
+			if cfg.LimitSize == 0 {
+				cfg.LimitSize = DefaultZapConfig.LimitSize
+			}
+		}
 	}
 
 	return cfg
