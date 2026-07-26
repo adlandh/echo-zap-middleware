@@ -151,10 +151,6 @@ func limitBytesWithDots(b []byte, size int) []byte {
 	}
 
 	truncated := limitBytes(b, size-3)
-	if len(truncated) == len(b) {
-		return b
-	}
-
 	out := make([]byte, len(truncated)+3)
 	copy(out, truncated)
 	copy(out[len(truncated):], "...")
