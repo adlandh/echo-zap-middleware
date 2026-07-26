@@ -19,10 +19,10 @@
 - To mirror CI locally: `curl -sS https://raw.githubusercontent.com/adlandh/golangci-lint-config/refs/heads/main/.golangci.yml -o .golangci.yml && golangci-lint run`.
 
 ## Middleware Gotchas
-- `ZapConfig` defaults are filled only for nil `Skipper` and nil `BodySkipper`; changing zero-value behavior can affect callers that pass partial configs.
-- `LimitHTTPBody: true` with `LimitSize <= 0` means no body limit; tests cover this explicitly.
+- `ZapConfig` fills nil function fields from defaults; enabling body dumping with zero-valued limit settings applies the default 500-byte limit.
+- A negative `LimitSize` explicitly disables the body capture limit.
 - Body dumping must preserve the downstream request body. Limited reads intentionally read `LimitSize+1` bytes and replay them with the original body.
-- `BodySkipper` does not prevent capture; it replaces non-empty logged bodies with `[excluded]`.
+- `BodySkipper` runs after the handler; skipped bodies are captured up to the configured limit and logged as `[excluded]`.
 - Request IDs are read from the request `X-Request-Id` header first, then the response header set by Echo request ID middleware.
 - A handler that returns nil without committing a response logs `Response not committed` at warn level.
 - `Middleware(nil)` is allowed: `context-logger` wraps the logger, and nil context loggers fall back to `zap.NewNop()`.

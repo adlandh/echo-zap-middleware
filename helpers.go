@@ -122,8 +122,13 @@ func limitBytes(b []byte, size int) []byte {
 	}
 
 	valid := b[:size]
-	for !utf8.Valid(valid) && len(valid) > 0 {
-		valid = valid[:len(valid)-1]
+	for i := 0; i < len(valid); {
+		r, width := utf8.DecodeRune(valid[i:])
+		if r == utf8.RuneError && width == 1 {
+			return valid[:i]
+		}
+
+		i += width
 	}
 
 	return valid

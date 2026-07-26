@@ -104,11 +104,13 @@ app.Use(echo_zap_middleware.Middleware(
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `Skipper` | `middleware.Skipper` | `middleware.DefaultSkipper` | Function to skip middleware execution for certain requests |
-| `BodySkipper` | `BodySkipper` | `defaultBodySkipper` | Function to exclude specific request/response bodies from logging |
+| `BodySkipper` | `BodySkipper` | `defaultBodySkipper` | Function evaluated after the handler to exclude bodies from logging |
 | `AreHeadersDump` | `bool` | `false` | Controls whether request and response headers are included in logs |
 | `IsBodyDump` | `bool` | `false` | Controls whether request and response bodies are included in logs |
-| `LimitHTTPBody` | `bool` | `true` | Controls whether to limit the size of logged HTTP bodies |
-| `LimitSize` | `int` | `500` | Maximum size (in bytes) for logged HTTP bodies; `<= 0` disables limiting |
+| `LimitHTTPBody` | `bool` | `true` | Enabled automatically for non-negative `LimitSize` values when body dumping is enabled |
+| `LimitSize` | `int` | `500` | Maximum size (in bytes) for logged HTTP bodies; `0` uses the default and `< 0` explicitly disables limiting |
+
+The `uri` log field contains only the escaped request path. Query parameters are omitted because they commonly contain tokens or personal data.
 
 ## Context-Aware Logging
 
@@ -182,11 +184,12 @@ func main() {
 			AreHeadersDump: true,
 			// if you would like to save your request or response body as tags, set IsBodyDump to true
 			IsBodyDump: true,
+			// Body logging uses the default 500-byte limit when limit settings are omitted
 			// No dump for /pong
 			// No dump for gzip
 			BodySkipper: func(c *echo.Context) (bool, bool) {
-				if c.Request().URL.Path == "/pong" { 
-					return true, true 
+				if c.Request().URL.Path == "/pong" {
+					return true, true
 				}
 				if c.Request().Header.Get("Content-Encoding") == "gzip" {
 					return true, true
@@ -255,6 +258,6 @@ The following benchmarks are available:
 When configuring the middleware, consider the following performance implications:
 
 1. Enabling body dumping (`IsBodyDump: true`) can significantly impact performance, especially with large request/response bodies.
-2. Using body size limits (`LimitHTTPBody: true`) can help mitigate performance issues when body dumping is enabled.
-3. Using a body skipper function to exclude large or binary content can improve performance.
+2. Body dumping uses a 500-byte capture limit by default. Set `LimitSize` to a negative value only when unbounded capture is explicitly required.
+3. A body skipper prevents excluded bodies from being logged, but they are still captured up to the configured limit.
 4. Header dumping (`AreHeadersDump: true`) has a smaller performance impact than body dumping but should still be considered.

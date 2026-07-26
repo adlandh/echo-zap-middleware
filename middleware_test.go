@@ -3,6 +3,7 @@ package echozapmiddleware
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -253,6 +254,43 @@ func (s *MiddlewareTestSuite) TestWithBodyAndHeaders() {
 	s.NotContains(s.sink.String(), "span_id")
 }
 
+func (s *MiddlewareTestSuite) TestPartialBodyConfigUsesDefaultLimit() {
+	body := strings.Repeat("a", DefaultZapConfig.LimitSize+100)
+	s.router.Use(Middleware(s.logger, ZapConfig{IsBodyDump: true}))
+	s.router.POST("/ping", func(c *echo.Context) error {
+		got, err := io.ReadAll(c.Request().Body)
+		s.Require().NoError(err)
+		s.Equal(body, string(got))
+
+		return c.String(http.StatusOK, body)
+	})
+
+	r := httptest.NewRequest(http.MethodPost, "/ping", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	s.Equal(http.StatusOK, w.Code)
+	s.Equal(body, w.Body.String())
+	truncated := strings.Repeat("a", DefaultZapConfig.LimitSize-3) + "..."
+	s.Contains(s.sink.String(), `"req.body": "`+truncated+`"`)
+	s.Contains(s.sink.String(), `"resp.body": "`+truncated+`"`)
+	s.expectMethod = http.MethodPost
+}
+
+func (s *MiddlewareTestSuite) TestQueryStringIsNotLogged() {
+	s.router.Use(Middleware(s.logger))
+	s.router.GET("/ping", func(c *echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	})
+
+	r := httptest.NewRequest(http.MethodGet, "/ping?access_token=secret", http.NoBody)
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, r)
+
+	s.NotContains(s.sink.String(), "access_token")
+	s.NotContains(s.sink.String(), "secret")
+}
+
 func (s *MiddlewareTestSuite) TestWithBodyAndHeadersWithContextLogger() {
 	s.router.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		RequestIDHandler: requestID.Saver,
@@ -312,9 +350,8 @@ func (s *MiddlewareTestSuite) TestBodySkipperNilDefaults() {
 
 func (s *MiddlewareTestSuite) TestBodyLimitApplied() {
 	s.router.Use(Middleware(s.logger, ZapConfig{
-		IsBodyDump:    true,
-		LimitHTTPBody: true,
-		LimitSize:     12,
+		IsBodyDump: true,
+		LimitSize:  12,
 	}))
 	s.router.POST("/ping", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
