@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/adlandh/context-logger v1.6.6
 	github.com/adlandh/response-dumper v1.3.0
-	github.com/labstack/echo/v5 v5.3.1
+	github.com/labstack/echo/v5 v5.4.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0
 )
